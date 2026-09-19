@@ -6,7 +6,7 @@
     <title>Descargador de Fotos desde Excel</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- SheetJS (XLSX) con espejos CDN de respaldo -->
+    <!-- SheetJS (XLSX) con respaldo -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script>
         if (typeof XLSX === 'undefined') {
@@ -119,37 +119,47 @@
             logContainer.scrollTop = logContainer.scrollHeight;
         }
 
-        async function fetchImageWithProxyFallback(url) {
+        function formatGoogleDriveUrl(url) {
+            if (url.includes('drive.google.com/file/d/')) {
+                const idMatch = url.match(/\/d\/([^\/]+)/);
+                if (idMatch && idMatch[1]) {
+                    return `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
+                }
+            }
+            return url;
+        }
+
+        async function fetchImageWithProxyFallback(originalUrl) {
+            const url = formatGoogleDriveUrl(originalUrl);
+
             // Intentar descarga directa
             try {
                 const response = await fetch(url);
                 if (response.ok) return await response.blob();
-            } catch (err) {
-                // Si falla por CORS, intentar con proxies
-            }
+            } catch (err) {}
 
-            // Intentar Proxy 1
+            // Intentar Proxy 1 (corsproxy.io)
             try {
-                const proxyUrl1 = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+                const proxyUrl1 = `https://corsproxy.io/?${encodeURIComponent(url)}`;
                 const response1 = await fetch(proxyUrl1);
                 if (response1.ok) return await response1.blob();
             } catch (err) {}
 
-            // Intentar Proxy 2
+            // Intentar Proxy 2 (allorigins)
             try {
-                const proxyUrl2 = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+                const proxyUrl2 = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
                 const response2 = await fetch(proxyUrl2);
                 if (response2.ok) return await response2.blob();
             } catch (err) {}
 
-            throw new Error("No se pudo descargar la imagen (Bloqueo de servidor o CORS)");
+            throw new Error("No se pudo acceder a la URL (posible requerimiento de inicio de sesión o permiso privado)");
         }
 
         processBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
 
             if (typeof XLSX === 'undefined') {
-                addLog("Error: La librería Excel no terminó de cargar. Recarga la página e intenta de nuevo.", "error");
+                addLog("Error: La librería de Excel no está lista. Por favor recarga la página.", "error");
                 return;
             }
 
@@ -190,14 +200,27 @@
                         percentageText.textContent = `${progress}%`;
                         statusText.textContent = `Procesando fila ${i + 1} de ${totalRows}...`;
 
+                        // Extraer datos fijos
+                        const doc = row[1] ? String(row[1]).strip ? String(row[1]).strip() : String(row[1]).trim() : "";
                         const p_nom = row[2] ? String(row[2]).trim() : "";
                         const s_nom = row[3] ? String(row[3]).trim() : "";
                         const p_ape = row[4] ? String(row[4]).trim() : "";
                         const s_ape = row[5] ? String(row[5]).trim() : "";
-                        const doc = row[1] ? String(row[1]).trim() : "";
-                        const url = row[7] ? String(row[7]).trim() : "";
+
+                        // Buscar la URL: primero en la columna 7 (índice 7), o en su defecto en cualquier celda de la fila
+                        let url = row[7] ? String(row[7]).trim() : "";
+                        if (!url.toLowerCase().startsWith('http')) {
+                            for (let c = 0; c < row.length; c++) {
+                                const val = String(row[c] || '').trim();
+                                if (val.toLowerCase().startsWith('http')) {
+                                    url = val;
+                                    break;
+                                }
+                            }
+                        }
 
                         if (!url.toLowerCase().startsWith('http')) {
+                            addLog(`Fila ${i + 1}: Omitida (no se encontró ningún enlace HTTP)`, "info");
                             continue;
                         }
 
@@ -206,6 +229,8 @@
                             base = base.replace(/__/g, '_');
                         }
                         base = base.replace(/^_+|_+$/g, '');
+
+                        if (!base) base = `Persona_${i + 1}`;
 
                         let ext = ".jpg";
                         const lowerUrl = url.toLowerCase();
@@ -237,7 +262,7 @@
                         addLog(`✔ Procesamiento finalizado. ${successCount} fotos guardadas en el ZIP.`, "success");
                     } else {
                         statusText.textContent = "Sin descargas exitosas.";
-                        addLog("No se pudo descargar ninguna foto del archivo proporcionado.", "error");
+                        addLog("No se pudo descargar ninguna foto. Verifica que las URLs del Excel sean públicas y no requieran inicio de sesión.", "error");
                     }
 
                 } catch (err) {
