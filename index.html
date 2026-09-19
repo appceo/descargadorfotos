@@ -1,0 +1,175 @@
+<div class="max-w-2xl w-full bg-white rounded-2xl shadow-xl border border-slate-100 p-8">
+    <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-slate-900 tracking-tight">📷 Descargador de Fotos</h1>
+        <p class="text-slate-500 mt-2 text-sm">Procesa tu archivo de Excel para descargar todas las imágenes organizadas en un paquete ZIP directamente desde tu navegador.</p>
+    </div>
+
+    <div class="space-y-6">
+        <!-- File Drop Area -->
+        <div class="border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-6 text-center transition-colors duration-200 bg-slate-50/50">
+            <input type="file" id="excelFile" accept=".xlsx, .xls" class="hidden">
+            <label for="excelFile" class="cursor-pointer flex flex-col items-center justify-center space-y-2">
+                <svg class="w-10 h-10 text-indigo-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+                <span class="text-sm font-medium text-slate-700" id="fileLabel">Haz clic para seleccionar o arrastra un archivo Excel</span>
+                <span class="text-xs text-slate-400">Formatos soportados: .xlsx, .xls</span>
+            </label>
+        </div>
+
+        <!-- Action Button -->
+        <button id="processBtn" disabled class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-semibold py-3 px-6 rounded-xl shadow-md transition duration-200 ease-in-out cursor-pointer disabled:cursor-not-allowed">
+            Procesar y Descargar Fotos
+        </button>
+
+        <!-- Progress Section -->
+        <div id="progressContainer" class="hidden space-y-3 pt-2">
+            <div class="flex justify-between text-sm font-medium">
+                <span id="statusText" class="text-slate-600">Iniciando proceso...</span>
+                <span id="percentageText" class="text-indigo-600 font-bold">0%</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                <div id="progressBar" class="bg-indigo-600 h-3 rounded-full transition-all duration-200" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Logs / Log Details -->
+        <div id="logContainer" class="hidden border border-slate-200 rounded-lg p-3 bg-slate-900 text-xs font-mono text-slate-300 max-h-40 overflow-y-auto space-y-1">
+        </div>
+    </div>
+</div>
+
+<script>
+    const excelFileInput = document.getElementById('excelFile');
+    const fileLabel = document.getElementById('fileLabel');
+    const processBtn = document.getElementById('processBtn');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const statusText = document.getElementById('statusText');
+    const percentageText = document.getElementById('percentageText');
+    const logContainer = document.getElementById('logContainer');
+
+    let selectedFile = null;
+
+    excelFileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            selectedFile = e.target.files[0];
+            fileLabel.textContent = `Archivo seleccionado: ${selectedFile.name}`;
+            processBtn.disabled = false;
+        }
+    });
+
+    function addLog(msg, type = 'info') {
+        logContainer.classList.remove('hidden');
+        const item = document.createElement('div');
+        if (type === 'error') item.className = 'text-red-400';
+        else if (type === 'success') item.className = 'text-emerald-400';
+        else item.className = 'text-slate-300';
+        
+        item.textContent = msg;
+        logContainer.appendChild(item);
+        logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    processBtn.addEventListener('click', async () => {
+        if (!selectedFile) return;
+
+        processBtn.disabled = true;
+        excelFileInput.disabled = true;
+        progressContainer.classList.remove('hidden');
+        logContainer.innerHTML = '';
+        
+        addLog("Leyendo archivo de Excel...");
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                if (rows.length === 0) {
+                    addLog("El archivo Excel está vacío.", "error");
+                    return;
+                }
+
+                const zip = new JSZip();
+                let downloadedCount = 0;
+                const totalRows = rows.length;
+
+                for (let i = 0; i < totalRows; i++) {
+                    const row = rows[i] || [];
+                    const progress = Math.round(((i + 1) / totalRows) * 100);
+                    
+                    progressBar.style.width = `${progress}%`;
+                    percentageText.textContent = `${progress}%`;
+                    statusText.textContent = `Procesando fila ${i + 1} de ${totalRows}...`;
+
+                    // Indice 1: Documento, Indice 2: P_Nom, 3: S_Nom, 4: P_Ape, 5: S_Ape, 7: URL
+                    const p_nom = row[2] ? String(row[2]).trim() : "";
+                    const s_nom = row[3] ? String(row[3]).trim() : "";
+                    const p_ape = row[4] ? String(row[4]).trim() : "";
+                    const s_ape = row[5] ? String(row[5]).trim() : "";
+                    const doc = row[1] ? String(row[1]).trim() : "";
+                    const url = row[7] ? String(row[7]).trim() : "";
+
+                    if (!url.toLowerCase().startsWith('http')) {
+                        continue;
+                    }
+
+                    let base = `${p_ape}_${s_ape}_${p_nom}_${s_nom}`.replace(/\s+/g, '_');
+                    while (base.includes('__')) {
+                        base = base.replace(/__/g, '_');
+                    }
+                    base = base.replace(/^_+|_+$/g, '');
+
+                    let ext = ".jpg";
+                    const lowerUrl = url.toLowerCase();
+                    if (lowerUrl.includes('.pdf')) ext = ".pdf";
+                    else if (lowerUrl.includes('.png')) ext = ".png";
+                    else if (lowerUrl.includes('.jpeg')) ext = ".jpeg";
+
+                    const filename = `${base}_${doc}${ext}`;
+
+                    try {
+                        // Descargar la imagen
+                        const response = await fetch(url);
+                        if (response.ok) {
+                            const blob = await response.blob();
+                            zip.file(filename, blob);
+                            downloadedCount++;
+                            addLog(`OK: ${filename}`, "success");
+                        } else {
+                            addLog(`Error al descargar fila ${i + 1}: Estado HTTP ${response.status}`, "error");
+                        }
+                    } catch (err) {
+                        addLog(`Error al descargar fila ${i + 1}: ${err.message}. (Verifica que la URL sea accesible/CORS)`, "error");
+                    }
+                }
+
+                if (downloadedCount > 0) {
+                    statusText.textContent = "Generando archivo ZIP...";
+                    addLog("Generando comprimido ZIP...");
+                    const zipContent = await zip.generateAsync({ type: "blob" });
+                    saveAs(zipContent, "Fotos_Apellido_Nombre.zip");
+                    statusText.textContent = "¡Completado!";
+                    addLog(`¡Proceso completado! Se descargaron ${downloadedCount} archivos.`, "success");
+                } else {
+                    statusText.textContent = "Sin descargas realizadas.";
+                    addLog("No se pudo descargar ninguna imagen válida.", "error");
+                }
+
+            } catch (err) {
+                addLog(`Error general: ${err.message}`, "error");
+            } finally {
+                processBtn.disabled = false;
+                excelFileInput.disabled = false;
+            }
+        };
+
+        reader.readAsArrayBuffer(selectedFile);
+    });
+</script>
+
