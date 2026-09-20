@@ -30,7 +30,7 @@
                 <i class="fa-solid fa-file-excel text-3xl text-emerald-400"></i>
                 <div>
                     <h1 class="text-xl font-bold leading-tight">Extractor de Fotos Excel</h1>
-                    <p class="text-xs text-indigo-200">Genera paquetes de imágenes individualizadas</p>
+                    <p class="text-xs text-indigo-200">Ordenado alfabéticamente por Apellido 1</p>
                 </div>
             </div>
             <button id="btnOpenGuide" class="bg-indigo-700 hover:bg-indigo-800 text-white text-sm px-4 py-2 rounded-lg font-medium transition flex items-center space-x-2 border border-indigo-500 shadow-sm">
@@ -50,11 +50,11 @@
                 <div class="text-center pointer-events-none">
                     <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-500 mb-3"></i>
                     <h3 class="text-lg font-semibold text-slate-700">Arrastra tu archivo Excel aquí o haz clic para examinar</h3>
-                    <p class="text-xs text-slate-500 mt-1">Soporta campos: Nombre 1, Nombre 2, APELLIDO 1, APELLIDO 2, FOTO (imágenes incrustadas, URLs o Base64)</p>
+                    <p class="text-xs text-slate-500 mt-1">Soporta campos: Nombre 1, Nombre 2, APELLIDO 1, APELLIDO 2, FOTO</p>
                 </div>
             </div>
 
-            <!-- Format Info Info -->
+            <!-- Format Info -->
             <div class="mt-4 grid grid-cols-1 md:grid-cols-5 gap-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100">
                 <span class="font-semibold text-slate-600 md:col-span-1">Estructura requerida:</span>
                 <span class="bg-white px-2 py-1 rounded border border-slate-200 text-center font-mono">Nombre 1</span>
@@ -69,7 +69,7 @@
             <div class="flex items-center space-x-3 w-full md:w-auto">
                 <div class="relative w-full md:w-64">
                     <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
-                    <input type="text" id="searchInput" placeholder="Buscar por nombre..." class="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <input type="text" id="searchInput" placeholder="Buscar por nombre o apellido..." class="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
                 <div class="text-xs text-slate-500 font-medium whitespace-nowrap" id="statsCount">
                     0 registros encontrados
@@ -77,6 +77,10 @@
             </div>
 
             <div class="flex items-center space-x-3 w-full md:w-auto justify-end">
+                <div class="text-xs text-indigo-600 font-semibold bg-indigo-50 px-3 py-2 rounded-lg border border-indigo-100 flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrow-down-a-z"></i>
+                    <span>Orden: APELLIDO 1</span>
+                </div>
                 <button id="btnDownloadZip" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow transition flex items-center space-x-2">
                     <i class="fa-solid fa-file-zipper text-base"></i>
                     <span>Descargar Todo (.ZIP)</span>
@@ -87,7 +91,7 @@
         <!-- Progress Spinner -->
         <div id="loader" class="hidden flex-col items-center justify-center py-12">
             <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-600 mb-3"></i>
-            <p class="text-slate-600 font-medium text-sm" id="loaderText">Procesando archivo e imágenes...</p>
+            <p class="text-slate-600 font-medium text-sm" id="loaderText">Procesando y ordenando por Apellido 1...</p>
         </div>
 
         <!-- Grid Results -->
@@ -114,20 +118,13 @@
                 </button>
             </div>
             <div class="p-6 overflow-y-auto space-y-4 text-sm text-slate-600 custom-scrollbar">
-                <p>Para tener esta aplicación disponible online de forma continua y reutilizable desde cualquier navegador, sigue estos pasos:</p>
-                
+                <p>Para alojar esta aplicación en GitHub y usarla múltiples veces:</p>
                 <ol class="list-decimal pl-5 space-y-3 font-medium">
-                    <li><strong>Guarda el código:</strong> Guarda este código en tu PC con el nombre de archivo <code class="bg-slate-100 text-indigo-600 px-1.5 py-0.5 rounded font-mono text-xs">index.html</code>.</li>
-                    <li><strong>Crea un repositorio en GitHub:</strong> Ingresa a <a href="https://github.com" target="_blank" class="text-indigo-600 underline">GitHub.com</a>, crea un nuevo repositorio público (ejemplo: <code class="bg-slate-100 text-slate-800 px-1 py-0.5 rounded text-xs">extractor-fotos</code>).</li>
-                    <li><strong>Sube el archivo:</strong> Dentro del repositorio, haz clic en <em>Add file &gt; Upload files</em> y arrastra el archivo <code class="bg-slate-100 text-indigo-600 px-1.5 py-0.5 rounded font-mono text-xs">index.html</code>. Haz clic en <em>Commit changes</em>.</li>
-                    <li><strong>Activa GitHub Pages:</strong>
-                        <ul class="list-disc pl-5 font-normal text-xs text-slate-500 mt-1 space-y-1">
-                            <li>Ve a la pestaña <strong>Settings</strong> (Configuración) de tu repositorio.</li>
-                            <li>En el menú izquierdo, busca la sección <strong>Pages</strong>.</li>
-                            <li>En <em>Build and deployment &gt; Branch</em>, selecciona la rama <code class="bg-slate-100 px-1 py-0.5 rounded">main</code> o <code class="bg-slate-100 px-1 py-0.5 rounded">master</code> y guarda (<code class="bg-slate-100 px-1 py-0.5 rounded">Save</code>).</li>
-                        </ul>
-                    </li>
-                    <li><strong>¡Listo!:</strong> En unos segundos GitHub te proporcionará un enlace web permanente (ejemplo: <code class="bg-slate-100 text-emerald-600 px-1.5 py-0.5 rounded font-mono text-xs">https://tu-usuario.github.io/extractor-fotos/</code>) utilizable las veces que quieras.</li>
+                    <li>Guarda este código en tu computadora como <code class="bg-slate-100 text-indigo-600 px-1.5 py-0.5 rounded font-mono text-xs">index.html</code>.</li>
+                    <li>Crea un repositorio público en tu cuenta de <a href="https://github.com" target="_blank" class="text-indigo-600 underline">GitHub</a>.</li>
+                    <li>Sube el archivo <code class="bg-slate-100 text-indigo-600 px-1.5 py-0.5 rounded font-mono text-xs">index.html</code> al repositorio.</li>
+                    <li>En <strong>Settings &gt; Pages</strong>, selecciona la rama <code class="bg-slate-100 px-1 py-0.5 rounded text-xs">main</code> y guarda.</li>
+                    <li>Abre el enlace generado por GitHub para usar la herramienta ilimitadamente.</li>
                 </ol>
             </div>
             <div class="bg-slate-50 px-6 py-3 border-t border-slate-100 text-right">
@@ -163,7 +160,7 @@
         btnCloseGuide.addEventListener('click', () => guideModal.classList.add('hidden'));
         btnCloseGuide2.addEventListener('click', () => guideModal.classList.add('hidden'));
 
-        // Drag and drop styles
+        // Drag and drop events
         ['dragenter', 'dragover'].forEach(eventName => {
             dropZone.addEventListener(eventName, (e) => {
                 e.preventDefault();
@@ -177,20 +174,19 @@
             }, false);
         });
 
-        // File Selection Event
         excelInput.addEventListener('change', handleFile);
 
         async function handleFile(e) {
             const file = e.target.files[0];
             if (!file) return;
 
-            showLoader('Analizando estructura del archivo Excel e imágenes...');
+            showLoader('Procesando datos y extrayendo imágenes...');
             processedRecords = [];
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
                 
-                // Parse Excel with SheetJS
+                // Parse Excel
                 const workbook = XLSX.read(arrayBuffer, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
@@ -201,10 +197,10 @@
 
                 // Process rows
                 jsonRows.forEach((row, index) => {
-                    const n1 = cleanField(row['Nombre 1'] || row['NOMBRE 1'] || row['Nombre1'] || '');
-                    const n2 = cleanField(row['Nombre 2'] || row['NOMBRE 2'] || row['Nombre2'] || '');
-                    const a1 = cleanField(row['APELLIDO 1'] || row['Apellido 1'] || row['Apellido1'] || '');
-                    const a2 = cleanField(row['APELLIDO 2'] || row['Apellido 2'] || row['Apellido2'] || '');
+                    const a1 = cleanField(row['APELLIDO 1'] || row['Apellido 1'] || row['Apellido1'] || row['APELLIDO1'] || '');
+                    const a2 = cleanField(row['APELLIDO 2'] || row['Apellido 2'] || row['Apellido2'] || row['APELLIDO2'] || '');
+                    const n1 = cleanField(row['Nombre 1'] || row['NOMBRE 1'] || row['Nombre1'] || row['NOMBRE1'] || '');
+                    const n2 = cleanField(row['Nombre 2'] || row['NOMBRE 2'] || row['Nombre2'] || row['NOMBRE2'] || '');
 
                     // Full Name construction
                     const fullNameArray = [n1, n2, a1, a2].filter(Boolean);
@@ -212,7 +208,7 @@
                         ? fullNameArray.join('_') 
                         : `Persona_${index + 1}`;
 
-                    // Photo Resolution (Embedded vs Base64/URL cell content)
+                    // Photo Resolution
                     let photoData = null;
                     const photoCell = row['FOTO'] || row['Foto'] || row['foto'] || '';
 
@@ -224,29 +220,33 @@
 
                     processedRecords.push({
                         id: index,
-                        n1, n2, a1, a2,
+                        a1, a2, n1, n2,
                         filename: `${formattedName}.jpg`,
                         photoData: photoData,
                         displayName: fullNameArray.join(' ') || `Persona ${index + 1}`
                     });
                 });
 
+                // --- ORDENAR ALFABÉTICAMENTE POR APELLIDO 1 ---
+                processedRecords.sort((a, b) => {
+                    const apellidoA = a.a1.toLowerCase();
+                    const apellidoB = b.a1.toLowerCase();
+                    return apellidoA.localeCompare(apellidoB, 'es', { sensitivity: 'base' });
+                });
+
                 renderGrid(processedRecords);
 
             } catch (error) {
                 console.error(error);
-                alert('Ocurrió un error al procesar el archivo Excel. Asegúrate de que sea un formato válido (.xlsx).');
+                alert('Ocurrió un error al procesar el archivo. Asegúrate de que sea un archivo Excel válido (.xlsx o .xls).');
             } finally {
                 hideLoader();
             }
         }
 
-        // Helper: Sanitize string for filenames
+        // Helper: Sanitize string for filenames & sorting
         function cleanField(str) {
-            return String(str)
-                .trim()
-                .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
-                .replace(/[^a-zA-Z0-9]/g, ""); // Keep alphanumeric only
+            return String(str).trim();
         }
 
         // Extract native drawings/images embedded in XLSX ZIP container
@@ -256,7 +256,6 @@
                 const zip = await JSZip.loadAsync(arrayBuffer);
                 const mediaFiles = Object.keys(zip.files).filter(path => path.startsWith('xl/media/'));
 
-                // Sort media sequentially as they appear in worksheets
                 mediaFiles.sort();
 
                 for (let i = 0; i < mediaFiles.length; i++) {
@@ -265,7 +264,7 @@
                     imagesMap[i] = URL.createObjectURL(blob);
                 }
             } catch (err) {
-                console.warn('No se pudieron extraer imágenes empaquetadas vía ZIP:', err);
+                console.warn('No se encontraron imágenes embebidas directas en ZIP:', err);
             }
             return imagesMap;
         }
@@ -334,7 +333,6 @@
             });
         }
 
-        // Single Download Helper
         function downloadSinglePhoto(record) {
             saveAs(record.photoData, record.filename);
         }
@@ -349,7 +347,7 @@
             renderGrid(filtered);
         });
 
-        // Batch ZIP Download
+        // Batch ZIP Download (Guardando el paquete también ordenado)
         btnDownloadZip.addEventListener('click', async () => {
             const recordsWithImages = processedRecords.filter(r => r.photoData);
             
@@ -358,9 +356,9 @@
                 return;
             }
 
-            showLoader('Generando paquete comprimido ZIP...');
+            showLoader('Empaquetando fotos ordenadas en archivo ZIP...');
             const zip = new JSZip();
-            const folder = zip.folder("Fotos_Extraidas");
+            const folder = zip.folder("Fotos_Ordenadas_Por_Apellido");
 
             for (let i = 0; i < recordsWithImages.length; i++) {
                 const rec = recordsWithImages[i];
@@ -376,16 +374,15 @@
                         folder.file(rec.filename, blob);
                     }
                 } catch (err) {
-                    console.error(`Error al incluir foto de ${rec.displayName}:`, err);
+                    console.error(`Error al incluir la foto de ${rec.displayName}:`, err);
                 }
             }
 
             const content = await zip.generateAsync({ type: "blob" });
-            saveAs(content, "Fotos_Excel_Extraidas.zip");
+            saveAs(content, "Fotos_Excel_Ordenadas.zip");
             hideLoader();
         });
 
-        // Loader Helpers
         function showLoader(msg) {
             loaderText.textContent = msg;
             loader.classList.remove('hidden');
