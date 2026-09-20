@@ -14,6 +14,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- FileSaver -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <!-- PDF.js para procesar archivos PDF a JPG -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
@@ -30,7 +32,7 @@
                 <i class="fa-solid fa-file-excel text-3xl text-emerald-400"></i>
                 <div>
                     <h1 class="text-xl font-bold leading-tight">Extractor de Fotos Excel</h1>
-                    <p class="text-xs text-indigo-200">Ordenado alfabéticamente por Apellido 1</p>
+                    <p class="text-xs text-indigo-200">Formato: APELLIDO1_APELLIDO2_Nombre1_Nombre2</p>
                 </div>
             </div>
             <button id="btnOpenGuide" class="bg-indigo-700 hover:bg-indigo-800 text-white text-sm px-4 py-2 rounded-lg font-medium transition flex items-center space-x-2 border border-indigo-500 shadow-sm">
@@ -50,7 +52,7 @@
                 <div class="text-center pointer-events-none">
                     <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-500 mb-3"></i>
                     <h3 class="text-lg font-semibold text-slate-700">Arrastra tu archivo Excel aquí o haz clic para examinar</h3>
-                    <p class="text-xs text-slate-500 mt-1">Soporta campos: Nombre 1, Nombre 2, APELLIDO 1, APELLIDO 2, FOTO</p>
+                    <p class="text-xs text-slate-500 mt-1">Soporta campos: Nombre 1, Nombre 2, APELLIDO 1, APELLIDO 2, FOTO (imágenes o PDF)</p>
                 </div>
             </div>
 
@@ -64,7 +66,7 @@
             </div>
         </div>
 
-        <!-- Controls Bar (Hidden initially) -->
+        <!-- Controls Bar -->
         <div id="controlsBar" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="flex items-center space-x-3 w-full md:w-auto">
                 <div class="relative w-full md:w-64">
@@ -91,7 +93,7 @@
         <!-- Progress Spinner -->
         <div id="loader" class="hidden flex-col items-center justify-center py-12">
             <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-600 mb-3"></i>
-            <p class="text-slate-600 font-medium text-sm" id="loaderText">Procesando y ordenando por Apellido 1...</p>
+            <p class="text-slate-600 font-medium text-sm" id="loaderText">Procesando y convirtiendo imágenes...</p>
         </div>
 
         <!-- Grid Results -->
@@ -104,6 +106,8 @@
             <p class="text-xs text-slate-400 mt-1">Adjunta un archivo Excel para extraer y descargar las fotos individualmente.</p>
         </div>
     </main>
+
+    <canvas id="pdfCanvas" class="hidden"></canvas>
 
     <!-- Modal GitHub Instructions -->
     <div id="guideModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
@@ -134,10 +138,12 @@
     </div>
 
     <script>
-        // Data Store
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+
         let processedRecords = [];
 
-        // DOM Elements
         const excelInput = document.getElementById('excelInput');
         const dropZone = document.getElementById('dropZone');
         const resultsGrid = document.getElementById('resultsGrid');
@@ -148,19 +154,17 @@
         const btnDownloadZip = document.getElementById('btnDownloadZip');
         const loader = document.getElementById('loader');
         const loaderText = document.getElementById('loaderText');
+        const pdfCanvas = document.getElementById('pdfCanvas');
 
-        // Modal Elements
         const guideModal = document.getElementById('guideModal');
         const btnOpenGuide = document.getElementById('btnOpenGuide');
         const btnCloseGuide = document.getElementById('btnCloseGuide');
         const btnCloseGuide2 = document.getElementById('btnCloseGuide2');
 
-        // Modal Events
         btnOpenGuide.addEventListener('click', () => guideModal.classList.remove('hidden'));
         btnCloseGuide.addEventListener('click', () => guideModal.classList.add('hidden'));
         btnCloseGuide2.addEventListener('click', () => guideModal.classList.add('hidden'));
 
-        // Drag and drop events
         ['dragenter', 'dragover'].forEach(eventName => {
             dropZone.addEventListener(eventName, (e) => {
                 e.preventDefault();
@@ -185,49 +189,48 @@
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
-                
-                // Parse Excel
                 const workbook = XLSX.read(arrayBuffer, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-                // Zip extraction for native embedded images
                 const embeddedImagesMap = await extractEmbeddedImagesFromZip(arrayBuffer);
+                const totalRows = jsonRows.length;
 
-                // Process rows
-                jsonRows.forEach((row, index) => {
+                for (let index = 0; index < totalRows; index++) {
+                    const row = jsonRows[index];
                     const a1 = cleanField(row['APELLIDO 1'] || row['Apellido 1'] || row['Apellido1'] || row['APELLIDO1'] || '');
                     const a2 = cleanField(row['APELLIDO 2'] || row['Apellido 2'] || row['Apellido2'] || row['APELLIDO2'] || '');
                     const n1 = cleanField(row['Nombre 1'] || row['NOMBRE 1'] || row['Nombre1'] || row['NOMBRE1'] || '');
                     const n2 = cleanField(row['Nombre 2'] || row['NOMBRE 2'] || row['Nombre2'] || row['NOMBRE2'] || '');
 
-                    // Full Name construction
-                    const fullNameArray = [n1, n2, a1, a2].filter(Boolean);
+                    // --- CAMBIO DE ORDEN: APELLIDOS PRIMERO ---
+                    const fullNameArray = [a1, a2, n1, n2].filter(Boolean);
                     const formattedName = fullNameArray.length > 0 
                         ? fullNameArray.join('_') 
                         : `Persona_${index + 1}`;
 
-                    // Photo Resolution
-                    let photoData = null;
-                    const photoCell = row['FOTO'] || row['Foto'] || row['foto'] || '';
+                    let rawPhoto = row['FOTO'] || row['Foto'] || row['foto'] || '';
+                    let finalPhotoData = null;
 
-                    if (photoCell && (photoCell.startsWith('http') || photoCell.startsWith('data:image'))) {
-                        photoData = photoCell;
+                    showLoader(`Procesando registro ${index + 1} de ${totalRows}: ${fullNameArray.join(' ')}`);
+
+                    if (rawPhoto) {
+                        finalPhotoData = await processUrlResource(rawPhoto);
                     } else if (embeddedImagesMap[index]) {
-                        photoData = embeddedImagesMap[index];
+                        finalPhotoData = await blobToBase64(embeddedImagesMap[index]);
                     }
 
                     processedRecords.push({
                         id: index,
                         a1, a2, n1, n2,
                         filename: `${formattedName}.jpg`,
-                        photoData: photoData,
-                        displayName: fullNameArray.join(' ') || `Persona ${index + 1}`
+                        photoData: finalPhotoData,
+                        displayName: `${a1} ${a2} ${n1} ${n2}`.trim() || `Persona ${index + 1}`
                     });
-                });
+                }
 
-                // --- ORDENAR ALFABÉTICAMENTE POR APELLIDO 1 ---
+                // Ordenar alfabéticamente por APELLIDO 1
                 processedRecords.sort((a, b) => {
                     const apellidoA = a.a1.toLowerCase();
                     const apellidoB = b.a1.toLowerCase();
@@ -238,24 +241,106 @@
 
             } catch (error) {
                 console.error(error);
-                alert('Ocurrió un error al procesar el archivo. Asegúrate de que sea un archivo Excel válido (.xlsx o .xls).');
+                alert('Ocurrió un error al procesar el archivo Excel.');
             } finally {
                 hideLoader();
             }
         }
 
-        // Helper: Sanitize string for filenames & sorting
+        async function processUrlResource(url) {
+            let src = String(url).trim();
+            if (src.startsWith('data:image')) return src;
+
+            if (src.includes('drive.google.com')) {
+                const idMatch = src.match(/\/d\/([^\/]+)/) || src.match(/id=([^&]+)/);
+                if (idMatch && idMatch[1]) {
+                    src = `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
+                }
+            } else if (src.includes('dropbox.com')) {
+                src = src.replace('dl=0', 'dl=1');
+            }
+
+            const proxies = [
+                (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+                (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`
+            ];
+
+            for (const proxyFn of proxies) {
+                try {
+                    const res = await fetch(proxyFn(src));
+                    if (!res.ok) continue;
+
+                    const contentType = res.headers.get('content-type') || '';
+                    const arrayBuffer = await res.arrayBuffer();
+
+                    const isPdf = contentType.includes('pdf') || src.toLowerCase().includes('.pdf') || isPdfHeader(arrayBuffer);
+
+                    if (isPdf) {
+                        return await convertPdfBufferToJpg(arrayBuffer);
+                    } else {
+                        return await arrayBufferToBase64(arrayBuffer);
+                    }
+                } catch (e) {
+                    continue;
+                }
+            }
+            return null;
+        }
+
+        function isPdfHeader(buffer) {
+            if (!buffer || buffer.byteLength < 5) return false;
+            const arr = new Uint8Array(buffer.slice(0, 5));
+            const header = String.fromCharCode.apply(null, arr);
+            return header.startsWith('%PDF-');
+        }
+
+        async function convertPdfBufferToJpg(arrayBuffer) {
+            try {
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const page = await pdf.getPage(1);
+                const viewport = page.getViewport({ scale: 2.0 });
+                const context = pdfCanvas.getContext('2d');
+                pdfCanvas.height = viewport.height;
+                pdfCanvas.width = viewport.width;
+
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                return pdfCanvas.toDataURL('image/jpeg', 0.92);
+            } catch (err) {
+                console.error('Error convirtiendo PDF:', err);
+                return null;
+            }
+        }
+
+        function arrayBufferToBase64(buffer) {
+            return new Promise((resolve) => {
+                const blob = new Blob([buffer]);
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        function blobToBase64(blobUrl) {
+            return fetch(blobUrl).then(r => r.blob()).then(blob => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.onerror = () => resolve(null);
+                    reader.readAsDataURL(blob);
+                });
+            }).catch(() => null);
+        }
+
         function cleanField(str) {
             return String(str).trim();
         }
 
-        // Extract native drawings/images embedded in XLSX ZIP container
         async function extractEmbeddedImagesFromZip(arrayBuffer) {
             const imagesMap = {};
             try {
                 const zip = await JSZip.loadAsync(arrayBuffer);
                 const mediaFiles = Object.keys(zip.files).filter(path => path.startsWith('xl/media/'));
-
                 mediaFiles.sort();
 
                 for (let i = 0; i < mediaFiles.length; i++) {
@@ -264,12 +349,11 @@
                     imagesMap[i] = URL.createObjectURL(blob);
                 }
             } catch (err) {
-                console.warn('No se encontraron imágenes embebidas directas en ZIP:', err);
+                console.warn('Sin imágenes nativas:', err);
             }
             return imagesMap;
         }
 
-        // Render Cards Grid
         function renderGrid(records) {
             resultsGrid.innerHTML = '';
 
@@ -299,7 +383,7 @@
                 } else {
                     imgContainer.innerHTML = `<div class="text-center p-4 text-slate-400">
                         <i class="fa-regular fa-image text-3xl mb-1"></i>
-                        <p class="text-xs">Sin foto adjunta</p>
+                        <p class="text-xs">Sin foto o PDF válido</p>
                     </div>`;
                 }
 
@@ -309,7 +393,7 @@
                 infoBox.innerHTML = `
                     <div>
                         <h4 class="font-bold text-slate-800 text-sm truncate" title="${rec.displayName}">${rec.displayName}</h4>
-                        <p class="text-xs font-mono text-slate-400 mt-0.5 truncate" title="${rec.filename}">${rec.filename}</p>
+                        <p class="text-xs font-mono text-indigo-600 font-semibold mt-0.5 truncate" title="${rec.filename}">${rec.filename}</p>
                     </div>
                 `;
 
@@ -323,7 +407,7 @@
                 btnDownload.innerHTML = `<i class="fa-solid fa-download"></i> <span>Descargar Foto</span>`;
                 
                 if (rec.photoData) {
-                    btnDownload.addEventListener('click', () => downloadSinglePhoto(rec));
+                    btnDownload.addEventListener('click', () => saveAs(rec.photoData, rec.filename));
                 }
 
                 infoBox.appendChild(btnDownload);
@@ -333,11 +417,6 @@
             });
         }
 
-        function downloadSinglePhoto(record) {
-            saveAs(record.photoData, record.filename);
-        }
-
-        // Search Filter
         searchInput.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
             const filtered = processedRecords.filter(r => 
@@ -347,34 +426,23 @@
             renderGrid(filtered);
         });
 
-        // Batch ZIP Download (Guardando el paquete también ordenado)
         btnDownloadZip.addEventListener('click', async () => {
             const recordsWithImages = processedRecords.filter(r => r.photoData);
             
             if (recordsWithImages.length === 0) {
-                alert('No hay fotos disponibles para empaquetar en ZIP.');
+                alert('No hay fotos válidas para empaquetar en el ZIP.');
                 return;
             }
 
-            showLoader('Empaquetando fotos ordenadas en archivo ZIP...');
+            showLoader('Empaquetando fotos en archivo ZIP...');
             const zip = new JSZip();
             const folder = zip.folder("Fotos_Ordenadas_Por_Apellido");
 
             for (let i = 0; i < recordsWithImages.length; i++) {
                 const rec = recordsWithImages[i];
-                try {
-                    if (rec.photoData.startsWith('data:image')) {
-                        const base64Data = rec.photoData.split(',')[1];
-                        folder.file(rec.filename, base64Data, { base64: true });
-                    } else if (rec.photoData.startsWith('blob:')) {
-                        const blob = await fetch(rec.photoData).then(r => r.blob());
-                        folder.file(rec.filename, blob);
-                    } else if (rec.photoData.startsWith('http')) {
-                        const blob = await fetch(rec.photoData).then(r => r.blob());
-                        folder.file(rec.filename, blob);
-                    }
-                } catch (err) {
-                    console.error(`Error al incluir la foto de ${rec.displayName}:`, err);
+                if (rec.photoData.startsWith('data:image')) {
+                    const base64Data = rec.photoData.split(',')[1];
+                    folder.file(rec.filename, base64Data, { base64: true });
                 }
             }
 
