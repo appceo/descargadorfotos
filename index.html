@@ -3,299 +3,399 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Descargador de Fotos desde Excel</title>
+    <title>Extractor de Fotos desde Excel</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- SheetJS (XLSX) -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script>
-        if (typeof XLSX === 'undefined') {
-            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"><\/script>');
-        }
-    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- JSZip -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- FileSaver -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
 
-    <div class="max-w-2xl w-full bg-slate-800/80 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-700/50 p-8">
-        <div class="text-center mb-8">
-            <h1 class="text-3xl font-extrabold text-white tracking-tight flex items-center justify-center gap-3">
-                <span>📷</span> Descargador de Fotos
-            </h1>
-            <p class="text-slate-400 mt-2 text-sm">Procesa tu archivo Excel para extraer y descargar automáticamente las fotos organizadas en un paquete ZIP.</p>
+    <!-- Header -->
+    <header class="bg-indigo-600 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-file-excel text-3xl text-emerald-400"></i>
+                <div>
+                    <h1 class="text-xl font-bold leading-tight">Extractor de Fotos Excel</h1>
+                    <p class="text-xs text-indigo-200">Genera paquetes de imágenes individualizadas</p>
+                </div>
+            </div>
+            <button id="btnOpenGuide" class="bg-indigo-700 hover:bg-indigo-800 text-white text-sm px-4 py-2 rounded-lg font-medium transition flex items-center space-x-2 border border-indigo-500 shadow-sm">
+                <i class="fa-brands fa-github text-lg"></i>
+                <span>¿Cómo alojar gratis en GitHub?</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6 flex flex-col gap-6">
+
+        <!-- File Upload Area -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <div class="flex flex-col items-center justify-center border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/50 rounded-xl p-8 transition cursor-pointer relative" id="dropZone">
+                <input type="file" id="excelInput" accept=".xlsx, .xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                <div class="text-center pointer-events-none">
+                    <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-500 mb-3"></i>
+                    <h3 class="text-lg font-semibold text-slate-700">Arrastra tu archivo Excel aquí o haz clic para examinar</h3>
+                    <p class="text-xs text-slate-500 mt-1">Soporta campos: Nombre 1, Nombre 2, APELLIDO 1, APELLIDO 2, FOTO (imágenes incrustadas, URLs o Base64)</p>
+                </div>
+            </div>
+
+            <!-- Format Info Info -->
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-5 gap-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                <span class="font-semibold text-slate-600 md:col-span-1">Estructura requerida:</span>
+                <span class="bg-white px-2 py-1 rounded border border-slate-200 text-center font-mono">Nombre 1</span>
+                <span class="bg-white px-2 py-1 rounded border border-slate-200 text-center font-mono">Nombre 2</span>
+                <span class="bg-white px-2 py-1 rounded border border-slate-200 text-center font-mono">APELLIDO 1</span>
+                <span class="bg-white px-2 py-1 rounded border border-slate-200 text-center font-mono">APELLIDO 2 | FOTO</span>
+            </div>
         </div>
 
-        <div class="space-y-6">
-            <!-- Drop Zone -->
-            <div id="dropZone" class="border-2 border-dashed border-slate-600 hover:border-indigo-500 rounded-xl p-8 text-center transition-all duration-300 bg-slate-800/40 hover:bg-slate-800/80 group cursor-pointer">
-                <input type="file" id="excelFile" accept=".xlsx, .xls" class="hidden">
-                <label for="excelFile" class="cursor-pointer flex flex-col items-center justify-center space-y-3">
-                    <div class="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                        <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <span class="text-sm font-semibold text-slate-200" id="fileLabel">Haz clic para seleccionar o arrastra un archivo Excel</span>
-                        <p class="text-xs text-slate-500 mt-1">Formatos soportados: .xlsx, .xls</p>
-                    </div>
-                </label>
-            </div>
-
-            <!-- Stats -->
-            <div id="statsContainer" class="hidden grid grid-cols-3 gap-3 text-center">
-                <div class="bg-slate-900/50 border border-slate-700/50 rounded-lg p-3">
-                    <span class="text-xs text-slate-400 block">Total Filas</span>
-                    <span id="statTotal" class="text-lg font-bold text-white">0</span>
+        <!-- Controls Bar (Hidden initially) -->
+        <div id="controlsBar" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-3 w-full md:w-auto">
+                <div class="relative w-full md:w-64">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
+                    <input type="text" id="searchInput" placeholder="Buscar por nombre..." class="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
-                <div class="bg-slate-900/50 border border-slate-700/50 rounded-lg p-3">
-                    <span class="text-xs text-slate-400 block">Descargadas</span>
-                    <span id="statSuccess" class="text-lg font-bold text-emerald-400">0</span>
-                </div>
-                <div class="bg-slate-900/50 border border-slate-700/50 rounded-lg p-3">
-                    <span class="text-xs text-slate-400 block">Errores</span>
-                    <span id="statErrors" class="text-lg font-bold text-rose-400">0</span>
+                <div class="text-xs text-slate-500 font-medium whitespace-nowrap" id="statsCount">
+                    0 registros encontrados
                 </div>
             </div>
 
-            <!-- Action Button -->
-            <button id="processBtn" disabled class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-3.5 px-6 rounded-xl shadow-lg transition duration-200 ease-in-out cursor-pointer disabled:cursor-not-allowed">
-                Procesar y Descargar Fotos
-            </button>
-
-            <!-- Progress Bar -->
-            <div id="progressContainer" class="hidden space-y-2 pt-2">
-                <div class="flex justify-between text-sm font-medium">
-                    <span id="statusText" class="text-slate-300">Iniciando proceso...</span>
-                    <span id="percentageText" class="text-indigo-400 font-bold">0%</span>
-                </div>
-                <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden border border-slate-700/50">
-                    <div id="progressBar" class="bg-gradient-to-r from-indigo-500 to-purple-500 h-2.5 rounded-full transition-all duration-200" style="width: 0%"></div>
-                </div>
+            <div class="flex items-center space-x-3 w-full md:w-auto justify-end">
+                <button id="btnDownloadZip" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow transition flex items-center space-x-2">
+                    <i class="fa-solid fa-file-zipper text-base"></i>
+                    <span>Descargar Todo (.ZIP)</span>
+                </button>
             </div>
+        </div>
 
-            <!-- Logs / Output -->
-            <div id="logContainer" class="hidden border border-slate-700/60 rounded-xl p-4 bg-slate-950 text-xs font-mono text-slate-300 max-h-48 overflow-y-auto space-y-1">
+        <!-- Progress Spinner -->
+        <div id="loader" class="hidden flex-col items-center justify-center py-12">
+            <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-600 mb-3"></i>
+            <p class="text-slate-600 font-medium text-sm" id="loaderText">Procesando archivo e imágenes...</p>
+        </div>
+
+        <!-- Grid Results -->
+        <div id="resultsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="text-center py-12 bg-white rounded-xl border border-slate-200 p-8">
+            <i class="fa-solid fa-image text-5xl text-slate-300 mb-3"></i>
+            <h3 class="text-base font-semibold text-slate-600">No hay fotos cargadas</h3>
+            <p class="text-xs text-slate-400 mt-1">Adjunta un archivo Excel para extraer y descargar las fotos individualmente.</p>
+        </div>
+    </main>
+
+    <!-- Modal GitHub Instructions -->
+    <div id="guideModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-indigo-600 text-white px-6 py-4 flex items-center justify-between">
+                <h3 class="font-bold text-lg flex items-center space-x-2">
+                    <i class="fa-brands fa-github text-xl"></i>
+                    <span>Publicar gratis en GitHub Pages</span>
+                </h3>
+                <button id="btnCloseGuide" class="text-indigo-200 hover:text-white text-xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-4 text-sm text-slate-600 custom-scrollbar">
+                <p>Para tener esta aplicación disponible online de forma continua y reutilizable desde cualquier navegador, sigue estos pasos:</p>
+                
+                <ol class="list-decimal pl-5 space-y-3 font-medium">
+                    <li><strong>Guarda el código:</strong> Guarda este código en tu PC con el nombre de archivo <code class="bg-slate-100 text-indigo-600 px-1.5 py-0.5 rounded font-mono text-xs">index.html</code>.</li>
+                    <li><strong>Crea un repositorio en GitHub:</strong> Ingresa a <a href="https://github.com" target="_blank" class="text-indigo-600 underline">GitHub.com</a>, crea un nuevo repositorio público (ejemplo: <code class="bg-slate-100 text-slate-800 px-1 py-0.5 rounded text-xs">extractor-fotos</code>).</li>
+                    <li><strong>Sube el archivo:</strong> Dentro del repositorio, haz clic en <em>Add file &gt; Upload files</em> y arrastra el archivo <code class="bg-slate-100 text-indigo-600 px-1.5 py-0.5 rounded font-mono text-xs">index.html</code>. Haz clic en <em>Commit changes</em>.</li>
+                    <li><strong>Activa GitHub Pages:</strong>
+                        <ul class="list-disc pl-5 font-normal text-xs text-slate-500 mt-1 space-y-1">
+                            <li>Ve a la pestaña <strong>Settings</strong> (Configuración) de tu repositorio.</li>
+                            <li>En el menú izquierdo, busca la sección <strong>Pages</strong>.</li>
+                            <li>En <em>Build and deployment &gt; Branch</em>, selecciona la rama <code class="bg-slate-100 px-1 py-0.5 rounded">main</code> o <code class="bg-slate-100 px-1 py-0.5 rounded">master</code> y guarda (<code class="bg-slate-100 px-1 py-0.5 rounded">Save</code>).</li>
+                        </ul>
+                    </li>
+                    <li><strong>¡Listo!:</strong> En unos segundos GitHub te proporcionará un enlace web permanente (ejemplo: <code class="bg-slate-100 text-emerald-600 px-1.5 py-0.5 rounded font-mono text-xs">https://tu-usuario.github.io/extractor-fotos/</code>) utilizable las veces que quieras.</li>
+                </ol>
+            </div>
+            <div class="bg-slate-50 px-6 py-3 border-t border-slate-100 text-right">
+                <button id="btnCloseGuide2" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition">Entendido</button>
             </div>
         </div>
     </div>
 
     <script>
-        const excelFileInput = document.getElementById('excelFile');
-        const fileLabel = document.getElementById('fileLabel');
-        const processBtn = document.getElementById('processBtn');
-        const progressContainer = document.getElementById('progressContainer');
-        const progressBar = document.getElementById('progressBar');
-        const statusText = document.getElementById('statusText');
-        const percentageText = document.getElementById('percentageText');
-        const logContainer = document.getElementById('logContainer');
-        const statsContainer = document.getElementById('statsContainer');
-        const statTotal = document.getElementById('statTotal');
-        const statSuccess = document.getElementById('statSuccess');
-        const statErrors = document.getElementById('statErrors');
+        // Data Store
+        let processedRecords = [];
 
-        let selectedFile = null;
+        // DOM Elements
+        const excelInput = document.getElementById('excelInput');
+        const dropZone = document.getElementById('dropZone');
+        const resultsGrid = document.getElementById('resultsGrid');
+        const emptyState = document.getElementById('emptyState');
+        const controlsBar = document.getElementById('controlsBar');
+        const statsCount = document.getElementById('statsCount');
+        const searchInput = document.getElementById('searchInput');
+        const btnDownloadZip = document.getElementById('btnDownloadZip');
+        const loader = document.getElementById('loader');
+        const loaderText = document.getElementById('loaderText');
 
-        excelFileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                selectedFile = e.target.files[0];
-                fileLabel.textContent = `Archivo: ${selectedFile.name}`;
-                processBtn.disabled = false;
-            }
+        // Modal Elements
+        const guideModal = document.getElementById('guideModal');
+        const btnOpenGuide = document.getElementById('btnOpenGuide');
+        const btnCloseGuide = document.getElementById('btnCloseGuide');
+        const btnCloseGuide2 = document.getElementById('btnCloseGuide2');
+
+        // Modal Events
+        btnOpenGuide.addEventListener('click', () => guideModal.classList.remove('hidden'));
+        btnCloseGuide.addEventListener('click', () => guideModal.classList.add('hidden'));
+        btnCloseGuide2.addEventListener('click', () => guideModal.classList.add('hidden'));
+
+        // Drag and drop styles
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-indigo-500', 'bg-indigo-100/50');
+            }, false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-indigo-500', 'bg-indigo-100/50');
+            }, false);
         });
 
-        function addLog(msg, type = 'info') {
-            logContainer.classList.remove('hidden');
-            const item = document.createElement('div');
-            if (type === 'error') item.className = 'text-rose-400 flex items-center gap-1.5';
-            else if (type === 'success') item.className = 'text-emerald-400 flex items-center gap-1.5';
-            else item.className = 'text-slate-300 flex items-center gap-1.5';
-            
-            item.textContent = msg;
-            logContainer.appendChild(item);
-            logContainer.scrollTop = logContainer.scrollHeight;
-        }
+        // File Selection Event
+        excelInput.addEventListener('change', handleFile);
 
-        function formatGoogleDriveUrl(url) {
-            if (url.includes('drive.google.com/file/d/')) {
-                const idMatch = url.match(/\/d\/([^\/]+)/);
-                if (idMatch && idMatch[1]) {
-                    return `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
-                }
-            } else if (url.includes('drive.google.com/open?id=')) {
-                const idMatch = url.match(/id=([^&]+)/);
-                if (idMatch && idMatch[1]) {
-                    return `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
-                }
+        async function handleFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            showLoader('Analizando estructura del archivo Excel e imágenes...');
+            processedRecords = [];
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                
+                // Parse Excel with SheetJS
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+                // Zip extraction for native embedded images
+                const embeddedImagesMap = await extractEmbeddedImagesFromZip(arrayBuffer);
+
+                // Process rows
+                jsonRows.forEach((row, index) => {
+                    const n1 = cleanField(row['Nombre 1'] || row['NOMBRE 1'] || row['Nombre1'] || '');
+                    const n2 = cleanField(row['Nombre 2'] || row['NOMBRE 2'] || row['Nombre2'] || '');
+                    const a1 = cleanField(row['APELLIDO 1'] || row['Apellido 1'] || row['Apellido1'] || '');
+                    const a2 = cleanField(row['APELLIDO 2'] || row['Apellido 2'] || row['Apellido2'] || '');
+
+                    // Full Name construction
+                    const fullNameArray = [n1, n2, a1, a2].filter(Boolean);
+                    const formattedName = fullNameArray.length > 0 
+                        ? fullNameArray.join('_') 
+                        : `Persona_${index + 1}`;
+
+                    // Photo Resolution (Embedded vs Base64/URL cell content)
+                    let photoData = null;
+                    const photoCell = row['FOTO'] || row['Foto'] || row['foto'] || '';
+
+                    if (photoCell && (photoCell.startsWith('http') || photoCell.startsWith('data:image'))) {
+                        photoData = photoCell;
+                    } else if (embeddedImagesMap[index]) {
+                        photoData = embeddedImagesMap[index];
+                    }
+
+                    processedRecords.push({
+                        id: index,
+                        n1, n2, a1, a2,
+                        filename: `${formattedName}.jpg`,
+                        photoData: photoData,
+                        displayName: fullNameArray.join(' ') || `Persona ${index + 1}`
+                    });
+                });
+
+                renderGrid(processedRecords);
+
+            } catch (error) {
+                console.error(error);
+                alert('Ocurrió un error al procesar el archivo Excel. Asegúrate de que sea un formato válido (.xlsx).');
+            } finally {
+                hideLoader();
             }
-            return url;
         }
 
-        async function fetchImageWithProxyFallback(originalUrl) {
-            const url = formatGoogleDriveUrl(originalUrl);
-
-            // 1. Intento directo
-            try {
-                const response = await fetch(url);
-                if (response.ok) return await response.blob();
-            } catch (err) {}
-
-            // 2. Proxy 1
-            try {
-                const proxyUrl1 = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-                const response1 = await fetch(proxyUrl1);
-                if (response1.ok) return await response1.blob();
-            } catch (err) {}
-
-            // 3. Proxy 2
-            try {
-                const proxyUrl2 = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-                const response2 = await fetch(proxyUrl2);
-                if (response2.ok) return await response2.blob();
-            } catch (err) {}
-
-            throw new Error("No se pudo acceder al enlace (Verifica permisos de acceso/público)");
+        // Helper: Sanitize string for filenames
+        function cleanField(str) {
+            return String(str)
+                .trim()
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
+                .replace(/[^a-zA-Z0-9]/g, ""); // Keep alphanumeric only
         }
 
-        processBtn.addEventListener('click', async () => {
-            if (!selectedFile) return;
+        // Extract native drawings/images embedded in XLSX ZIP container
+        async function extractEmbeddedImagesFromZip(arrayBuffer) {
+            const imagesMap = {};
+            try {
+                const zip = await JSZip.loadAsync(arrayBuffer);
+                const mediaFiles = Object.keys(zip.files).filter(path => path.startsWith('xl/media/'));
 
-            if (typeof XLSX === 'undefined') {
-                addLog("Error: La librería XLSX no está lista. Por favor recarga la página.", "error");
+                // Sort media sequentially as they appear in worksheets
+                mediaFiles.sort();
+
+                for (let i = 0; i < mediaFiles.length; i++) {
+                    const file = zip.files[mediaFiles[i]];
+                    const blob = await file.async('blob');
+                    imagesMap[i] = URL.createObjectURL(blob);
+                }
+            } catch (err) {
+                console.warn('No se pudieron extraer imágenes empaquetadas vía ZIP:', err);
+            }
+            return imagesMap;
+        }
+
+        // Render Cards Grid
+        function renderGrid(records) {
+            resultsGrid.innerHTML = '';
+
+            if (records.length === 0) {
+                emptyState.classList.remove('hidden');
+                controlsBar.classList.add('hidden');
                 return;
             }
 
-            processBtn.disabled = true;
-            excelFileInput.disabled = true;
-            progressContainer.classList.remove('hidden');
-            statsContainer.classList.remove('hidden');
-            logContainer.innerHTML = '';
-            
-            let successCount = 0;
-            let errorCount = 0;
+            emptyState.classList.add('hidden');
+            controlsBar.classList.remove('hidden');
+            statsCount.textContent = `${records.length} registro(s) procesados`;
 
-            addLog("Leyendo archivo Excel...");
+            records.forEach(rec => {
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between';
 
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    
-                    // Convertir a JSON
-                    const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                const imgContainer = document.createElement('div');
+                imgContainer.className = 'w-full h-48 bg-slate-100 flex items-center justify-center overflow-hidden relative border-b border-slate-100';
 
-                    if (jsonRows.length === 0) {
-                        addLog("El archivo Excel está vacío o no tiene un formato válido.", "error");
-                        return;
-                    }
-
-                    const zip = new JSZip();
-                    const totalRows = jsonRows.length;
-                    statTotal.textContent = totalRows;
-
-                    for (let i = 0; i < totalRows; i++) {
-                        const row = jsonRows[i];
-                        const progress = Math.round(((i + 1) / totalRows) * 100);
-                        
-                        progressBar.style.width = `${progress}%`;
-                        percentageText.textContent = `${progress}%`;
-                        statusText.textContent = `Procesando fila ${i + 1} de ${totalRows}...`;
-
-                        // Extraer valores de la fila
-                        const keys = Object.keys(row);
-                        let nameParts = [];
-                        let doc = "";
-                        let url = "";
-
-                        keys.forEach(k => {
-                            const val = String(row[k] || '').trim();
-                            const keyLower = k.toLowerCase();
-
-                            if (val.toLowerCase().startsWith('http')) {
-                                url = val;
-                            } else if (keyLower.includes('doc') || keyLower.includes('cedula') || keyLower.includes('id')) {
-                                doc = val;
-                            } else if (val !== "") {
-                                nameParts.push(val);
-                            }
-                        });
-
-                        // Si no encontró URL por clave, buscar cualquier celda con http
-                        if (!url) {
-                            for (let k of keys) {
-                                const val = String(row[k] || '').trim();
-                                if (val.toLowerCase().startsWith('http')) {
-                                    url = val;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (!url) {
-                            addLog(`Fila ${i + 1}: Omitida (No se encontró ningún enlace HTTP)`, "info");
-                            continue;
-                        }
-
-                        // Filtrar el nombre quitando la URL y el Documento
-                        let cleanNameParts = nameParts.filter(p => p !== url && p !== doc);
-                        let base = cleanNameParts.join('_').replace(/\s+/g, '_');
-                        
-                        while (base.includes('__')) {
-                            base = base.replace(/__/g, '_');
-                        }
-                        base = base.replace(/^_+|_+$/g, '');
-
-                        if (!base) base = `Registro_${i + 1}`;
-
-                        let ext = ".jpg";
-                        const lowerUrl = url.toLowerCase();
-                        if (lowerUrl.includes('.pdf')) ext = ".pdf";
-                        else if (lowerUrl.includes('.png')) ext = ".png";
-                        else if (lowerUrl.includes('.jpeg')) ext = ".jpeg";
-
-                        const filename = doc ? `${base}_${doc}${ext}` : `${base}${ext}`;
-
-                        try {
-                            const blob = await fetchImageWithProxyFallback(url);
-                            zip.file(filename, blob);
-                            successCount++;
-                            statSuccess.textContent = successCount;
-                            addLog(`✔ Guardado: ${filename}`, "success");
-                        } catch (err) {
-                            errorCount++;
-                            statErrors.textContent = errorCount;
-                            addLog(`✖ Error fila ${i + 1}: ${err.message}`, "error");
-                        }
-                    }
-
-                    if (successCount > 0) {
-                        statusText.textContent = "Generando paquete ZIP...";
-                        addLog("Empaquetando fotos en el archivo ZIP...");
-                        const zipContent = await zip.generateAsync({ type: "blob" });
-                        saveAs(zipContent, "Fotos_Apellido_Nombre.zip");
-                        statusText.textContent = "¡Completado!";
-                        addLog(`✔ Proceso terminado: ${successCount} fotos empaquetadas con éxito.`, "success");
-                    } else {
-                        statusText.textContent = "Sin descargas exitosas.";
-                        addLog("No se pudo descargar ninguna imagen. Comprueba que los links sean públicos.", "error");
-                    }
-
-                } catch (err) {
-                    addLog(`Error al leer el archivo: ${err.message}`, "error");
-                } finally {
-                    processBtn.disabled = false;
-                    excelFileInput.disabled = false;
+                if (rec.photoData) {
+                    const img = document.createElement('img');
+                    img.src = rec.photoData;
+                    img.alt = rec.displayName;
+                    img.className = 'w-full h-full object-cover';
+                    imgContainer.appendChild(img);
+                } else {
+                    imgContainer.innerHTML = `<div class="text-center p-4 text-slate-400">
+                        <i class="fa-regular fa-image text-3xl mb-1"></i>
+                        <p class="text-xs">Sin foto adjunta</p>
+                    </div>`;
                 }
-            };
 
-            reader.readAsArrayBuffer(selectedFile);
+                const infoBox = document.createElement('div');
+                infoBox.className = 'p-4 flex-grow flex flex-col justify-between';
+
+                infoBox.innerHTML = `
+                    <div>
+                        <h4 class="font-bold text-slate-800 text-sm truncate" title="${rec.displayName}">${rec.displayName}</h4>
+                        <p class="text-xs font-mono text-slate-400 mt-0.5 truncate" title="${rec.filename}">${rec.filename}</p>
+                    </div>
+                `;
+
+                const btnDownload = document.createElement('button');
+                btnDownload.className = `mt-3 w-full text-xs font-medium py-2 rounded-lg flex items-center justify-center space-x-2 transition ${
+                    rec.photoData 
+                        ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700' 
+                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                }`;
+                btnDownload.disabled = !rec.photoData;
+                btnDownload.innerHTML = `<i class="fa-solid fa-download"></i> <span>Descargar Foto</span>`;
+                
+                if (rec.photoData) {
+                    btnDownload.addEventListener('click', () => downloadSinglePhoto(rec));
+                }
+
+                infoBox.appendChild(btnDownload);
+                card.appendChild(imgContainer);
+                card.appendChild(infoBox);
+                resultsGrid.appendChild(card);
+            });
+        }
+
+        // Single Download Helper
+        function downloadSinglePhoto(record) {
+            saveAs(record.photoData, record.filename);
+        }
+
+        // Search Filter
+        searchInput.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const filtered = processedRecords.filter(r => 
+                r.displayName.toLowerCase().includes(term) || 
+                r.filename.toLowerCase().includes(term)
+            );
+            renderGrid(filtered);
         });
+
+        // Batch ZIP Download
+        btnDownloadZip.addEventListener('click', async () => {
+            const recordsWithImages = processedRecords.filter(r => r.photoData);
+            
+            if (recordsWithImages.length === 0) {
+                alert('No hay fotos disponibles para empaquetar en ZIP.');
+                return;
+            }
+
+            showLoader('Generando paquete comprimido ZIP...');
+            const zip = new JSZip();
+            const folder = zip.folder("Fotos_Extraidas");
+
+            for (let i = 0; i < recordsWithImages.length; i++) {
+                const rec = recordsWithImages[i];
+                try {
+                    if (rec.photoData.startsWith('data:image')) {
+                        const base64Data = rec.photoData.split(',')[1];
+                        folder.file(rec.filename, base64Data, { base64: true });
+                    } else if (rec.photoData.startsWith('blob:')) {
+                        const blob = await fetch(rec.photoData).then(r => r.blob());
+                        folder.file(rec.filename, blob);
+                    } else if (rec.photoData.startsWith('http')) {
+                        const blob = await fetch(rec.photoData).then(r => r.blob());
+                        folder.file(rec.filename, blob);
+                    }
+                } catch (err) {
+                    console.error(`Error al incluir foto de ${rec.displayName}:`, err);
+                }
+            }
+
+            const content = await zip.generateAsync({ type: "blob" });
+            saveAs(content, "Fotos_Excel_Extraidas.zip");
+            hideLoader();
+        });
+
+        // Loader Helpers
+        function showLoader(msg) {
+            loaderText.textContent = msg;
+            loader.classList.remove('hidden');
+            loader.classList.add('flex');
+        }
+
+        function hideLoader() {
+            loader.classList.add('hidden');
+            loader.classList.remove('flex');
+        }
     </script>
 </body>
 </html>
