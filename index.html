@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extractor y Conversor de Fotos desde Excel</title>
+    <title>Extractor de Fotos desde Excel</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
@@ -14,8 +14,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- FileSaver -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <!-- PDF.js para conversión de PDF a Imagen -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
@@ -31,8 +29,8 @@
             <div class="flex items-center space-x-3">
                 <i class="fa-solid fa-file-excel text-3xl text-emerald-400"></i>
                 <div>
-                    <h1 class="text-xl font-bold leading-tight">Extractor de Fotos y PDF a Imagen</h1>
-                    <p class="text-xs text-indigo-200">Ordenado por Apellido 1 | Convierte PDFs a JPG automáticamente</p>
+                    <h1 class="text-xl font-bold leading-tight">Extractor de Fotos Excel</h1>
+                    <p class="text-xs text-indigo-200">Ordenado alfabéticamente por Apellido 1</p>
                 </div>
             </div>
             <button id="btnOpenGuide" class="bg-indigo-700 hover:bg-indigo-800 text-white text-sm px-4 py-2 rounded-lg font-medium transition flex items-center space-x-2 border border-indigo-500 shadow-sm">
@@ -52,7 +50,7 @@
                 <div class="text-center pointer-events-none">
                     <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-500 mb-3"></i>
                     <h3 class="text-lg font-semibold text-slate-700">Arrastra tu archivo Excel aquí o haz clic para examinar</h3>
-                    <p class="text-xs text-slate-500 mt-1">Soporta campos: Nombre 1, Nombre 2, APELLIDO 1, APELLIDO 2, FOTO (imágenes o enlaces PDF)</p>
+                    <p class="text-xs text-slate-500 mt-1">Soporta campos: Nombre 1, Nombre 2, APELLIDO 1, APELLIDO 2, FOTO</p>
                 </div>
             </div>
 
@@ -93,7 +91,7 @@
         <!-- Progress Spinner -->
         <div id="loader" class="hidden flex-col items-center justify-center py-12">
             <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-600 mb-3"></i>
-            <p class="text-slate-600 font-medium text-sm" id="loaderText">Procesando, convirtiendo PDFs a imagen y ordenando...</p>
+            <p class="text-slate-600 font-medium text-sm" id="loaderText">Procesando y ordenando por Apellido 1...</p>
         </div>
 
         <!-- Grid Results -->
@@ -103,12 +101,9 @@
         <div id="emptyState" class="text-center py-12 bg-white rounded-xl border border-slate-200 p-8">
             <i class="fa-solid fa-image text-5xl text-slate-300 mb-3"></i>
             <h3 class="text-base font-semibold text-slate-600">No hay fotos cargadas</h3>
-            <p class="text-xs text-slate-400 mt-1">Adjunta un archivo Excel para extraer y convertir imágenes/PDFs automáticamente.</p>
+            <p class="text-xs text-slate-400 mt-1">Adjunta un archivo Excel para extraer y descargar las fotos individualmente.</p>
         </div>
     </main>
-
-    <!-- Canvas oculto para renderizado de PDFs -->
-    <canvas id="pdfCanvas" class="hidden"></canvas>
 
     <!-- Modal GitHub Instructions -->
     <div id="guideModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
@@ -139,9 +134,6 @@
     </div>
 
     <script>
-        // Configuración de PDF.js Worker
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
         // Data Store
         let processedRecords = [];
 
@@ -156,7 +148,6 @@
         const btnDownloadZip = document.getElementById('btnDownloadZip');
         const loader = document.getElementById('loader');
         const loaderText = document.getElementById('loaderText');
-        const pdfCanvas = document.getElementById('pdfCanvas');
 
         // Modal Elements
         const guideModal = document.getElementById('guideModal');
@@ -164,6 +155,7 @@
         const btnCloseGuide = document.getElementById('btnCloseGuide');
         const btnCloseGuide2 = document.getElementById('btnCloseGuide2');
 
+        // Modal Events
         btnOpenGuide.addEventListener('click', () => guideModal.classList.remove('hidden'));
         btnCloseGuide.addEventListener('click', () => guideModal.classList.add('hidden'));
         btnCloseGuide2.addEventListener('click', () => guideModal.classList.add('hidden'));
@@ -188,7 +180,7 @@
             const file = e.target.files[0];
             if (!file) return;
 
-            showLoader('Leyendo archivo Excel y procesando registros...');
+            showLoader('Procesando datos y extrayendo imágenes...');
             processedRecords = [];
 
             try {
@@ -200,51 +192,42 @@
                 const worksheet = workbook.Sheets[firstSheetName];
                 const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-                // Zip extraction para imágenes embebidas
+                // Zip extraction for native embedded images
                 const embeddedImagesMap = await extractEmbeddedImagesFromZip(arrayBuffer);
 
-                const total = jsonRows.length;
-
-                for (let index = 0; index < total; index++) {
-                    const row = jsonRows[index];
+                // Process rows
+                jsonRows.forEach((row, index) => {
                     const a1 = cleanField(row['APELLIDO 1'] || row['Apellido 1'] || row['Apellido1'] || row['APELLIDO1'] || '');
                     const a2 = cleanField(row['APELLIDO 2'] || row['Apellido 2'] || row['Apellido2'] || row['APELLIDO2'] || '');
                     const n1 = cleanField(row['Nombre 1'] || row['NOMBRE 1'] || row['Nombre1'] || row['NOMBRE1'] || '');
                     const n2 = cleanField(row['Nombre 2'] || row['NOMBRE 2'] || row['Nombre2'] || row['NOMBRE2'] || '');
 
+                    // Full Name construction
                     const fullNameArray = [n1, n2, a1, a2].filter(Boolean);
                     const formattedName = fullNameArray.length > 0 
                         ? fullNameArray.join('_') 
                         : `Persona_${index + 1}`;
 
-                    let rawPhoto = row['FOTO'] || row['Foto'] || row['foto'] || '';
-                    let finalImageData = null;
+                    // Photo Resolution
+                    let photoData = null;
+                    const photoCell = row['FOTO'] || row['Foto'] || row['foto'] || '';
 
-                    showLoader(`Procesando registro ${index + 1} de ${total}...`);
-
-                    // Identificar si la celda contiene una URL/datos de PDF o Imagen
-                    if (rawPhoto) {
-                        const lowerPhoto = rawPhoto.toLowerCase();
-                        if (lowerPhoto.endsWith('.pdf') || lowerPhoto.includes('application/pdf') || rawPhoto.startsWith('data:application/pdf')) {
-                            // Convertir PDF a Imagen JPG
-                            finalImageData = await convertPdfToImage(rawPhoto);
-                        } else if (rawPhoto.startsWith('http') || rawPhoto.startsWith('data:image')) {
-                            finalImageData = rawPhoto;
-                        }
+                    if (photoCell && (photoCell.startsWith('http') || photoCell.startsWith('data:image'))) {
+                        photoData = photoCell;
                     } else if (embeddedImagesMap[index]) {
-                        finalImageData = embeddedImagesMap[index];
+                        photoData = embeddedImagesMap[index];
                     }
 
                     processedRecords.push({
                         id: index,
                         a1, a2, n1, n2,
                         filename: `${formattedName}.jpg`,
-                        photoData: finalImageData,
+                        photoData: photoData,
                         displayName: fullNameArray.join(' ') || `Persona ${index + 1}`
                     });
-                }
+                });
 
-                // Ordenar por APELLIDO 1
+                // --- ORDENAR ALFABÉTICAMENTE POR APELLIDO 1 ---
                 processedRecords.sort((a, b) => {
                     const apellidoA = a.a1.toLowerCase();
                     const apellidoB = b.a1.toLowerCase();
@@ -255,46 +238,24 @@
 
             } catch (error) {
                 console.error(error);
-                alert('Ocurrió un error al procesar el archivo Excel o los PDFs.');
+                alert('Ocurrió un error al procesar el archivo. Asegúrate de que sea un archivo Excel válido (.xlsx o .xls).');
             } finally {
                 hideLoader();
             }
         }
 
-        // Función para renderizar la primera página del PDF en formato Data URL (.jpg)
-        async function convertPdfToImage(pdfSource) {
-            try {
-                let loadingTask = pdfjsLib.getDocument(pdfSource);
-                let pdf = await loadingTask.promise;
-                let page = await pdf.getPage(1); // Extraer la primera página
-
-                let viewport = page.getViewport({ scale: 1.5 });
-                let context = pdfCanvas.getContext('2d');
-                pdfCanvas.height = viewport.height;
-                pdfCanvas.width = viewport.width;
-
-                let renderContext = {
-                    canvasContext: context,
-                    viewport: viewport
-                };
-
-                await page.render(renderContext).promise;
-                return pdfCanvas.toDataURL('image/jpeg', 0.9);
-            } catch (err) {
-                console.warn('Error al convertir PDF a imagen:', err);
-                return null;
-            }
-        }
-
+        // Helper: Sanitize string for filenames & sorting
         function cleanField(str) {
             return String(str).trim();
         }
 
+        // Extract native drawings/images embedded in XLSX ZIP container
         async function extractEmbeddedImagesFromZip(arrayBuffer) {
             const imagesMap = {};
             try {
                 const zip = await JSZip.loadAsync(arrayBuffer);
                 const mediaFiles = Object.keys(zip.files).filter(path => path.startsWith('xl/media/'));
+
                 mediaFiles.sort();
 
                 for (let i = 0; i < mediaFiles.length; i++) {
@@ -303,11 +264,12 @@
                     imagesMap[i] = URL.createObjectURL(blob);
                 }
             } catch (err) {
-                console.warn('Sin imágenes embebidas directas:', err);
+                console.warn('No se encontraron imágenes embebidas directas en ZIP:', err);
             }
             return imagesMap;
         }
 
+        // Render Cards Grid
         function renderGrid(records) {
             resultsGrid.innerHTML = '';
 
@@ -337,7 +299,7 @@
                 } else {
                     imgContainer.innerHTML = `<div class="text-center p-4 text-slate-400">
                         <i class="fa-regular fa-image text-3xl mb-1"></i>
-                        <p class="text-xs">Sin imagen o PDF válido</p>
+                        <p class="text-xs">Sin foto adjunta</p>
                     </div>`;
                 }
 
@@ -358,7 +320,7 @@
                         : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                 }`;
                 btnDownload.disabled = !rec.photoData;
-                btnDownload.innerHTML = `<i class="fa-solid fa-download"></i> <span>Descargar JPG</span>`;
+                btnDownload.innerHTML = `<i class="fa-solid fa-download"></i> <span>Descargar Foto</span>`;
                 
                 if (rec.photoData) {
                     btnDownload.addEventListener('click', () => downloadSinglePhoto(rec));
@@ -375,6 +337,7 @@
             saveAs(record.photoData, record.filename);
         }
 
+        // Search Filter
         searchInput.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
             const filtered = processedRecords.filter(r => 
@@ -384,15 +347,16 @@
             renderGrid(filtered);
         });
 
+        // Batch ZIP Download (Guardando el paquete también ordenado)
         btnDownloadZip.addEventListener('click', async () => {
             const recordsWithImages = processedRecords.filter(r => r.photoData);
             
             if (recordsWithImages.length === 0) {
-                alert('No hay imágenes disponibles para empaquetar en ZIP.');
+                alert('No hay fotos disponibles para empaquetar en ZIP.');
                 return;
             }
 
-            showLoader('Empaquetando imágenes ordenadas en archivo ZIP...');
+            showLoader('Empaquetando fotos ordenadas en archivo ZIP...');
             const zip = new JSZip();
             const folder = zip.folder("Fotos_Ordenadas_Por_Apellido");
 
@@ -402,7 +366,10 @@
                     if (rec.photoData.startsWith('data:image')) {
                         const base64Data = rec.photoData.split(',')[1];
                         folder.file(rec.filename, base64Data, { base64: true });
-                    } else if (rec.photoData.startsWith('blob:') || rec.photoData.startsWith('http')) {
+                    } else if (rec.photoData.startsWith('blob:')) {
+                        const blob = await fetch(rec.photoData).then(r => r.blob());
+                        folder.file(rec.filename, blob);
+                    } else if (rec.photoData.startsWith('http')) {
                         const blob = await fetch(rec.photoData).then(r => r.blob());
                         folder.file(rec.filename, blob);
                     }
