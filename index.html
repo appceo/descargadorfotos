@@ -66,7 +66,7 @@
             </div>
         </div>
 
-        <!-- Controls Bar (Hidden initially) -->
+        <!-- Controls Bar -->
         <div id="controlsBar" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="flex items-center space-x-3 w-full md:w-auto">
                 <div class="relative w-full md:w-64">
@@ -93,7 +93,7 @@
         <!-- Progress Spinner -->
         <div id="loader" class="hidden flex-col items-center justify-center py-12">
             <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-600 mb-3"></i>
-            <p class="text-slate-600 font-medium text-sm" id="loaderText">Procesando, convirtiendo PDFs a imagen y ordenando...</p>
+            <p class="text-slate-600 font-medium text-sm" id="loaderText">Procesando y convirtiendo archivos...</p>
         </div>
 
         <!-- Grid Results -->
@@ -139,13 +139,11 @@
     </div>
 
     <script>
-        // Configuración de PDF.js Worker
+        // Configuración Worker PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-        // Data Store
         let processedRecords = [];
 
-        // DOM Elements
         const excelInput = document.getElementById('excelInput');
         const dropZone = document.getElementById('dropZone');
         const resultsGrid = document.getElementById('resultsGrid');
@@ -158,7 +156,6 @@
         const loaderText = document.getElementById('loaderText');
         const pdfCanvas = document.getElementById('pdfCanvas');
 
-        // Modal Elements
         const guideModal = document.getElementById('guideModal');
         const btnOpenGuide = document.getElementById('btnOpenGuide');
         const btnCloseGuide = document.getElementById('btnCloseGuide');
@@ -168,7 +165,6 @@
         btnCloseGuide.addEventListener('click', () => guideModal.classList.add('hidden'));
         btnCloseGuide2.addEventListener('click', () => guideModal.classList.add('hidden'));
 
-        // Drag and drop events
         ['dragenter', 'dragover'].forEach(eventName => {
             dropZone.addEventListener(eventName, (e) => {
                 e.preventDefault();
@@ -193,16 +189,12 @@
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
-                
-                // Parse Excel
                 const workbook = XLSX.read(arrayBuffer, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-                // Zip extraction para imágenes embebidas
                 const embeddedImagesMap = await extractEmbeddedImagesFromZip(arrayBuffer);
-
                 const total = jsonRows.length;
 
                 for (let index = 0; index < total; index++) {
@@ -220,17 +212,11 @@
                     let rawPhoto = row['FOTO'] || row['Foto'] || row['foto'] || '';
                     let finalImageData = null;
 
-                    showLoader(`Procesando registro ${index + 1} de ${total}...`);
+                    showLoader(`Procesando registro ${index + 1} de ${total}: ${fullNameArray.join(' ')}`);
 
-                    // Identificar si la celda contiene una URL/datos de PDF o Imagen
                     if (rawPhoto) {
-                        const lowerPhoto = rawPhoto.toLowerCase();
-                        if (lowerPhoto.endsWith('.pdf') || lowerPhoto.includes('application/pdf') || rawPhoto.startsWith('data:application/pdf')) {
-                            // Convertir PDF a Imagen JPG
-                            finalImageData = await convertPdfToImage(rawPhoto);
-                        } else if (rawPhoto.startsWith('http') || rawPhoto.startsWith('data:image')) {
-                            finalImageData = rawPhoto;
-                        }
+                        // Procesamiento inteligente de URL / PDF / Imagen
+                        finalImageData = await processResource(rawPhoto);
                     } else if (embeddedImagesMap[index]) {
                         finalImageData = embeddedImagesMap[index];
                     }
@@ -244,7 +230,7 @@
                     });
                 }
 
-                // Ordenar por APELLIDO 1
+                // Ordenar por APELLIDO 1 (A-Z)
                 processedRecords.sort((a, b) => {
                     const apellidoA = a.a1.toLowerCase();
                     const apellidoB = b.a1.toLowerCase();
@@ -255,33 +241,87 @@
 
             } catch (error) {
                 console.error(error);
-                alert('Ocurrió un error al procesar el archivo Excel o los PDFs.');
+                alert('Ocurrió un error al procesar el archivo Excel o los recursos.');
             } finally {
                 hideLoader();
             }
         }
 
-        // Función para renderizar la primera página del PDF en formato Data URL (.jpg)
-        async function convertPdfToImage(pdfSource) {
-            try {
-                let loadingTask = pdfjsLib.getDocument(pdfSource);
-                let pdf = await loadingTask.promise;
-                let page = await pdf.getPage(1); // Extraer la primera página
+        // Procesa recursos remotos (Imágenes y PDFs) superando CORS
+        async function processResource(urlOrData) {
+            let src = String(urlOrData).trim();
 
-                let viewport = page.getViewport({ scale: 1.5 });
-                let context = pdfCanvas.getContext('2d');
+            if (src.startsWith('data:image')) {
+                return src;
+            }
+
+            // Normalización de enlaces compartidos de servicios en la nube
+            if (src.includes('drive.google.com')) {
+                const idMatch = src.match(/\/d\/([^\/]+)/) || src.match(/id=([^&]+)/);
+                if (idMatch && idMatch[1]) {
+                    src = `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
+                }
+            } else if (src.includes('dropbox.com')) {
+                src = src.replace('dl=0', 'dl=1');
+            }
+
+            // Bypass CORS usando proxy
+            let requestUrl = src;
+            if (src.startsWith('http')) {
+                requestUrl = 'https://corsproxy.io/?' + encodeURIComponent(src);
+            }
+
+            try {
+                const response = await fetch(requestUrl);
+                if (!response.ok) throw new Error('Respuesta de red no válida');
+
+                const contentType = response.headers.get('content-type') || '';
+                const blob = await response.blob();
+                const arrayBuffer = await blob.arrayBuffer();
+
+                // Detección de PDF por encabezado mime o firma de archivo (%PDF)
+                const isPdf = contentType.includes('pdf') || 
+                              src.toLowerCase().includes('.pdf') || 
+                              isPdfBuffer(arrayBuffer);
+
+                if (isPdf) {
+                    return await renderPdfBufferToJpg(arrayBuffer);
+                } else {
+                    return URL.createObjectURL(blob);
+                }
+            } catch (err) {
+                console.warn('Error al procesar recurso remoto:', src, err);
+                return null;
+            }
+        }
+
+        // Verifica si los bytes iniciales pertenecen a un archivo PDF
+        function isPdfBuffer(buffer) {
+            const arr = new Uint8Array(buffer.slice(0, 5));
+            const header = String.fromCharCode.apply(null, arr);
+            return header.startsWith('%PDF-');
+        }
+
+        // Renderiza el buffer del PDF a formato JPG mediante canvas
+        async function renderPdfBufferToJpg(arrayBuffer) {
+            try {
+                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                const pdf = await loadingTask.promise;
+                const page = await pdf.getPage(1);
+
+                const viewport = page.getViewport({ scale: 2.0 }); // Alta resolución
+                const context = pdfCanvas.getContext('2d');
                 pdfCanvas.height = viewport.height;
                 pdfCanvas.width = viewport.width;
 
-                let renderContext = {
+                await page.render({
                     canvasContext: context,
                     viewport: viewport
-                };
+                }).promise;
 
-                await page.render(renderContext).promise;
-                return pdfCanvas.toDataURL('image/jpeg', 0.9);
+                return pdfCanvas.toDataURL('image/jpeg', 0.92);
             } catch (err) {
-                console.warn('Error al convertir PDF a imagen:', err);
+                console.error('Error durante la renderización del PDF:', err);
                 return null;
             }
         }
