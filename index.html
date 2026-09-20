@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extractor y Conversor Definitivo de Fotos desde Excel</title>
+    <title>Extractor y Conversor de Fotos Excel a JPG</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
@@ -14,7 +14,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- FileSaver -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <!-- PDF.js para conversión nativa de PDF a Imagen -->
+    <!-- PDF.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -25,14 +25,13 @@
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
 
-    <!-- Header -->
     <header class="bg-indigo-600 text-white shadow-md">
         <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div class="flex items-center space-x-3">
                 <i class="fa-solid fa-file-excel text-3xl text-emerald-400"></i>
                 <div>
                     <h1 class="text-xl font-bold leading-tight">Extractor de Fotos & PDF a Imagen</h1>
-                    <p class="text-xs text-indigo-200">Ordenado por Apellido 1 | Motor de conversión robusto con rotación CORS</p>
+                    <p class="text-xs text-indigo-200">Procesador ultra-rápido por lotes | Asíncrono con control de timeout</p>
                 </div>
             </div>
             <button id="btnOpenGuide" class="bg-indigo-700 hover:bg-indigo-800 text-white text-sm px-4 py-2 rounded-lg font-medium transition flex items-center space-x-2 border border-indigo-500 shadow-sm">
@@ -42,22 +41,21 @@
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6 flex flex-col gap-6">
 
-        <!-- File Upload Area -->
+        <!-- Dropzone de carga -->
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <div class="flex flex-col items-center justify-center border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/50 rounded-xl p-8 transition cursor-pointer relative" id="dropZone">
                 <input type="file" id="excelInput" accept=".xlsx, .xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
                 <div class="text-center pointer-events-none">
                     <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-500 mb-3"></i>
                     <h3 class="text-lg font-semibold text-slate-700">Arrastra tu archivo Excel aquí o haz clic para examinar</h3>
-                    <p class="text-xs text-slate-500 mt-1">Soporta campos: Nombre 1, Nombre 2, APELLIDO 1, APELLIDO 2, FOTO (imágenes, URLs o PDFs)</p>
+                    <p class="text-xs text-slate-500 mt-1">Soporta columnas: Nombre 1, Nombre 2, APELLIDO 1, APELLIDO 2, FOTO (imágenes o PDFs)</p>
                 </div>
             </div>
 
             <div class="mt-4 grid grid-cols-1 md:grid-cols-5 gap-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                <span class="font-semibold text-slate-600 md:col-span-1">Estructura requerida:</span>
+                <span class="font-semibold text-slate-600 md:col-span-1">Columnas reconocidas:</span>
                 <span class="bg-white px-2 py-1 rounded border border-slate-200 text-center font-mono">Nombre 1</span>
                 <span class="bg-white px-2 py-1 rounded border border-slate-200 text-center font-mono">Nombre 2</span>
                 <span class="bg-white px-2 py-1 rounded border border-slate-200 text-center font-mono">APELLIDO 1</span>
@@ -65,7 +63,6 @@
             </div>
         </div>
 
-        <!-- Controls Bar -->
         <div id="controlsBar" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="flex items-center space-x-3 w-full md:w-auto">
                 <div class="relative w-full md:w-64">
@@ -89,27 +86,28 @@
             </div>
         </div>
 
-        <!-- Progress Spinner -->
-        <div id="loader" class="hidden flex-col items-center justify-center py-12">
-            <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-600 mb-3"></i>
-            <p class="text-slate-600 font-medium text-sm" id="loaderText">Procesando y convirtiendo recursos...</p>
+        <div id="loader" class="hidden bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex-col items-center justify-center">
+            <div class="w-full max-w-md bg-slate-100 rounded-full h-3 mb-3 overflow-hidden">
+                <div id="progressBar" class="bg-indigo-600 h-full w-0 transition-all duration-200"></div>
+            </div>
+            <p class="text-slate-700 font-medium text-sm" id="loaderText">Iniciando procesamiento...</p>
+            <p class="text-xs text-slate-400 mt-1" id="loaderSubtext">Procesando por lotes para evitar que la página se congele</p>
         </div>
 
-        <!-- Grid Results -->
+        <!-- Grid de resultados -->
         <div id="resultsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
 
-        <!-- Empty State -->
+        <!-- Estado vacío -->
         <div id="emptyState" class="text-center py-12 bg-white rounded-xl border border-slate-200 p-8">
             <i class="fa-solid fa-image text-5xl text-slate-300 mb-3"></i>
             <h3 class="text-base font-semibold text-slate-600">No hay fotos cargadas</h3>
-            <p class="text-xs text-slate-400 mt-1">Adjunta un archivo Excel para extraer y descargar las fotos automáticamente.</p>
+            <p class="text-xs text-slate-400 mt-1">Adjunta un archivo Excel con enlaces de fotos/PDFs para procesarlos automáticamente.</p>
         </div>
     </main>
 
-    <!-- Canvas Ocultos para Renderizado -->
+    <!-- Canvas oculto para conversión de PDF -->
     <canvas id="pdfCanvas" class="hidden"></canvas>
 
-    <!-- Modal GitHub Instructions -->
     <div id="guideModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
         <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
             <div class="bg-indigo-600 text-white px-6 py-4 flex items-center justify-between">
@@ -122,13 +120,13 @@
                 </button>
             </div>
             <div class="p-6 overflow-y-auto space-y-4 text-sm text-slate-600 custom-scrollbar">
-                <p>Para alojar esta aplicación en GitHub y usarla múltiples veces:</p>
+                <p>Pasos para publicar y ejecutar esta app sin límite de red:</p>
                 <ol class="list-decimal pl-5 space-y-3 font-medium">
-                    <li>Guarda este código en tu computadora como <code class="bg-slate-100 text-indigo-600 px-1.5 py-0.5 rounded font-mono text-xs">index.html</code>.</li>
-                    <li>Crea un repositorio público en tu cuenta de <a href="https://github.com" target="_blank" class="text-indigo-600 underline">GitHub</a>.</li>
+                    <li>Guarda este código en tu PC con el nombre <code class="bg-slate-100 text-indigo-600 px-1.5 py-0.5 rounded font-mono text-xs">index.html</code>.</li>
+                    <li>Entra a <a href="https://github.com" target="_blank" class="text-indigo-600 underline">GitHub.com</a> y crea un nuevo repositorio público.</li>
                     <li>Sube el archivo <code class="bg-slate-100 text-indigo-600 px-1.5 py-0.5 rounded font-mono text-xs">index.html</code> al repositorio.</li>
-                    <li>En <strong>Settings &gt; Pages</strong>, selecciona la rama <code class="bg-slate-100 px-1 py-0.5 rounded text-xs">main</code> y guarda.</li>
-                    <li>Abre el enlace generado por GitHub para usar la herramienta ilimitadamente.</li>
+                    <li>Ve a <strong>Settings &gt; Pages</strong> en el repositorio, selecciona la rama <code class="bg-slate-100 px-1 py-0.5 rounded text-xs">main</code> y pulsa <strong>Save</strong>.</li>
+                    <li>Tu aplicación estará disponible públicamente en pocos segundos en la URL proporcionada.</li>
                 </ol>
             </div>
             <div class="bg-slate-50 px-6 py-3 border-t border-slate-100 text-right">
@@ -138,9 +136,9 @@
     </div>
 
     <script>
-        // Desactivar Web Worker externo en PDF.js para evitar bloqueos Cross-Origin
+        // Configuración correcta del Worker desde CDN JSDelivr
         if (typeof pdfjsLib !== 'undefined') {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
         }
 
         let processedRecords = [];
@@ -155,6 +153,7 @@
         const btnDownloadZip = document.getElementById('btnDownloadZip');
         const loader = document.getElementById('loader');
         const loaderText = document.getElementById('loaderText');
+        const progressBar = document.getElementById('progressBar');
         const pdfCanvas = document.getElementById('pdfCanvas');
 
         const guideModal = document.getElementById('guideModal');
@@ -181,11 +180,195 @@
 
         excelInput.addEventListener('change', handleFile);
 
+        function normalizeUrl(url) {
+            let src = String(url).trim();
+            if (src.includes('drive.google.com')) {
+                const idMatch = src.match(/\/d\/([^\/]+)/) || src.match(/id=([^&]+)/);
+                if (idMatch && idMatch[1]) {
+                    return `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
+                }
+            }
+            if (src.includes('dropbox.com')) {
+                return src.replace('dl=0', 'dl=1');
+            }
+            return src;
+        }
+
+        // Helper de Timeout para evitar bloqueos
+        function fetchWithTimeout(url, options = {}, timeout = 5000) {
+            return Promise.race([
+                fetch(url, options),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Timeout de conexión excedido')), timeout)
+                )
+            ]);
+        }
+
+        async function fetchResourceWithFallback(url) {
+            const cleanUrl = normalizeUrl(url);
+
+            // 1. Fetch directo con Timeout de 5s
+            try {
+                const response = await fetchWithTimeout(cleanUrl, {}, 5000);
+                if (response.ok) {
+                    const buffer = await response.arrayBuffer();
+                    return buffer;
+                }
+            } catch (e) {}
+
+            // 2. Proxies CORS públicos en rotación rápida (Timeout 5s c/u)
+            const proxies = [
+                (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+                (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+                (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
+            ];
+
+            for (const proxyFn of proxies) {
+                try {
+                    const proxyUrl = proxyFn(cleanUrl);
+                    const response = await fetchWithTimeout(proxyUrl, {}, 5000);
+                    if (response.ok) {
+                        return await response.arrayBuffer();
+                    }
+                } catch (e) {
+                    continue;
+                }
+            }
+
+            // 3. Intento mediante HTML Image fallback
+            try {
+                const dataUrl = await loadImageElementFallback(cleanUrl);
+                if (dataUrl) return dataUrl;
+            } catch (e) {}
+
+            return null;
+        }
+
+        function loadImageElementFallback(url) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                let timer = setTimeout(() => {
+                    img.src = '';
+                    resolve(null);
+                }, 5000);
+
+                img.onload = () => {
+                    clearTimeout(timer);
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.naturalWidth || img.width;
+                        canvas.height = img.naturalHeight || img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        resolve(canvas.toDataURL('image/jpeg', 0.9));
+                    } catch (err) {
+                        resolve(null);
+                    }
+                };
+
+                img.onerror = () => {
+                    clearTimeout(timer);
+                    resolve(null);
+                };
+
+                img.src = url;
+            });
+        }
+
+        function isPdfBuffer(buffer) {
+            if (!buffer || buffer.byteLength < 5) return false;
+            const arr = new Uint8Array(buffer.slice(0, 5));
+            const header = String.fromCharCode.apply(null, arr);
+            return header.startsWith('%PDF-');
+        }
+
+        function arrayBufferToBase64Image(buffer) {
+            return new Promise((resolve) => {
+                const blob = new Blob([buffer]);
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        async function renderPdfBufferToJpg(arrayBuffer) {
+            return new Promise(async (resolve) => {
+                let isResolved = false;
+
+                // Timeout estricto de 5 segundos para conversión PDF
+                const timeoutTimer = setTimeout(() => {
+                    if (!isResolved) {
+                        isResolved = true;
+                        resolve(null);
+                    }
+                }, 5000);
+
+                try {
+                    const loadingTask = pdfjsLib.getDocument({
+                        data: arrayBuffer,
+                        disableFontFace: true
+                    });
+
+                    const pdf = await loadingTask.promise;
+                    const page = await pdf.getPage(1);
+
+                    const viewport = page.getViewport({ scale: 1.5 });
+                    const context = pdfCanvas.getContext('2d');
+                    pdfCanvas.height = viewport.height;
+                    pdfCanvas.width = viewport.width;
+
+                    await page.render({
+                        canvasContext: context,
+                        viewport: viewport
+                    }).promise;
+
+                    clearTimeout(timeoutTimer);
+                    if (!isResolved) {
+                        isResolved = true;
+                        resolve(pdfCanvas.toDataURL('image/jpeg', 0.9));
+                    }
+                } catch (err) {
+                    clearTimeout(timeoutTimer);
+                    if (!isResolved) {
+                        isResolved = true;
+                        resolve(null);
+                    }
+                }
+            });
+        }
+
+        async function processSingleResource(rawUrl) {
+            const str = String(rawUrl).trim();
+            if (str.startsWith('data:image')) return str;
+
+            try {
+                const resource = await fetchResourceWithFallback(str);
+                if (!resource) return null;
+
+                if (typeof resource === 'string' && resource.startsWith('data:image')) {
+                    return resource;
+                }
+
+                if (resource instanceof ArrayBuffer) {
+                    if (isPdfBuffer(resource)) {
+                        return await renderPdfBufferToJpg(resource);
+                    } else {
+                        return await arrayBufferToBase64Image(resource);
+                    }
+                }
+            } catch (err) {
+                return null;
+            }
+            return null;
+        }
+
         async function handleFile(e) {
             const file = e.target.files[0];
             if (!file) return;
 
-            showLoader('Analizando estructura del archivo Excel...');
+            showLoader('Leyendo archivo Excel...', 0);
             processedRecords = [];
 
             try {
@@ -198,6 +381,7 @@
                 const embeddedImagesMap = await extractEmbeddedImagesFromZip(arrayBuffer);
                 const total = jsonRows.length;
 
+                // PROCESAMIENTO EN LOTES (BATCHING)
                 for (let index = 0; index < total; index++) {
                     const row = jsonRows[index];
                     const a1 = cleanField(row['APELLIDO 1'] || row['Apellido 1'] || row['Apellido1'] || row['APELLIDO1'] || '');
@@ -213,10 +397,11 @@
                     let rawPhoto = row['FOTO'] || row['Foto'] || row['foto'] || '';
                     let finalImageData = null;
 
-                    showLoader(`Procesando ${index + 1} de ${total}: ${fullNameArray.join(' ')}`);
+                    const percent = Math.round(((index + 1) / total) * 100);
+                    showLoader(`Procesando (${index + 1}/${total}): ${fullNameArray.join(' ') || 'Registro'}`, percent);
 
                     if (rawPhoto) {
-                        finalImageData = await fetchAndConvertResource(rawPhoto);
+                        finalImageData = await processSingleResource(rawPhoto);
                     } else if (embeddedImagesMap[index]) {
                         finalImageData = embeddedImagesMap[index];
                     }
@@ -228,9 +413,12 @@
                         photoData: finalImageData,
                         displayName: fullNameArray.join(' ') || `Persona ${index + 1}`
                     });
+
+                    // Permitir respirar a la UI entre iteraciones
+                    await new Promise(r => setTimeout(r, 10));
                 }
 
-                // Ordenar alfabéticamente por APELLIDO 1
+                // Ordenar por APELLIDO 1
                 processedRecords.sort((a, b) => {
                     const apellidoA = a.a1.toLowerCase();
                     const apellidoB = b.a1.toLowerCase();
@@ -241,123 +429,9 @@
 
             } catch (error) {
                 console.error(error);
-                alert('Ocurrió un error al procesar el archivo.');
+                alert('Ocurrió un error al procesar el archivo Excel.');
             } finally {
                 hideLoader();
-            }
-        }
-
-        // Normalizador de URLs de almacenamiento en la nube
-        function normalizeUrl(url) {
-            let src = url.trim();
-            if (src.includes('drive.google.com')) {
-                const idMatch = src.match(/\/d\/([^\/]+)/) || src.match(/id=([^&]+)/);
-                if (idMatch && idMatch[1]) {
-                    return `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
-                }
-            }
-            if (src.includes('dropbox.com')) {
-                return src.replace('dl=0', 'dl=1');
-            }
-            return src;
-        }
-
-        // Descarga segura con rotación de proxies para solucionar CORS
-        async function fetchWithCorsBypass(url) {
-            const cleanUrl = normalizeUrl(url);
-
-            // 1. Intento directo
-            try {
-                const res = await fetch(cleanUrl);
-                if (res.ok) return await res.arrayBuffer();
-            } catch (e) {}
-
-            // Lista de Proxies CORS de Respaldo
-            const proxies = [
-                (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-                (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-                (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
-            ];
-
-            for (const proxyFn of proxies) {
-                try {
-                    const proxyUrl = proxyFn(cleanUrl);
-                    const res = await fetch(proxyUrl);
-                    if (res.ok) {
-                        return await res.arrayBuffer();
-                    }
-                } catch (e) {
-                    continue;
-                }
-            }
-
-            throw new Error('No se pudo acceder al recurso remoto mediante ningún proxy CORS.');
-        }
-
-        // Procesa URLs de cualquier origen y las convierte a Data Base64 JPG puro
-        async function fetchAndConvertResource(rawUrl) {
-            const str = String(rawUrl).trim();
-            if (str.startsWith('data:image')) return str;
-
-            try {
-                const buffer = await fetchWithCorsBypass(str);
-
-                if (isPdfBuffer(buffer)) {
-                    // Si es un archivo PDF -> Renderizar a JPG Base64
-                    return await renderPdfBufferToJpg(buffer);
-                } else {
-                    // Si es una imagen -> Convertir a Data Base64
-                    return await imageBufferToBase64(buffer);
-                }
-            } catch (err) {
-                console.warn('Error crítico cargando recurso:', rawUrl, err);
-                return null;
-            }
-        }
-
-        // Valida si la firma de los bytes del buffer corresponde a un PDF (%PDF)
-        function isPdfBuffer(buffer) {
-            if (!buffer || buffer.byteLength < 5) return false;
-            const arr = new Uint8Array(buffer.slice(0, 5));
-            const header = String.fromCharCode.apply(null, arr);
-            return header.startsWith('%PDF-');
-        }
-
-        // Convierte un buffer de imagen a Base64 puro
-        function imageBufferToBase64(buffer) {
-            return new Promise((resolve) => {
-                const blob = new Blob([buffer]);
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.onerror = () => resolve(null);
-                reader.readAsDataURL(blob);
-            });
-        }
-
-        // Convierte la 1ª página de un PDF a un Data URL JPG usando PDF.js nativo en hilo principal
-        async function renderPdfBufferToJpg(arrayBuffer) {
-            try {
-                const loadingTask = pdfjsLib.getDocument({
-                    data: arrayBuffer,
-                    disableFontFace: true
-                });
-                const pdf = await loadingTask.promise;
-                const page = await pdf.getPage(1);
-
-                const viewport = page.getViewport({ scale: 2.0 });
-                const context = pdfCanvas.getContext('2d');
-                pdfCanvas.height = viewport.height;
-                pdfCanvas.width = viewport.width;
-
-                await page.render({
-                    canvasContext: context,
-                    viewport: viewport
-                }).promise;
-
-                return pdfCanvas.toDataURL('image/jpeg', 0.92);
-            } catch (err) {
-                console.error('Error procesando páginas del PDF:', err);
-                return null;
             }
         }
 
@@ -377,9 +451,7 @@
                     const blob = await file.async('blob');
                     imagesMap[i] = URL.createObjectURL(blob);
                 }
-            } catch (err) {
-                console.warn('Sin imágenes nativas en Excel ZIP:', err);
-            }
+            } catch (err) {}
             return imagesMap;
         }
 
@@ -412,7 +484,7 @@
                 } else {
                     imgContainer.innerHTML = `<div class="text-center p-4 text-slate-400">
                         <i class="fa-regular fa-image text-3xl mb-1"></i>
-                        <p class="text-xs">Sin imagen o PDF válido</p>
+                        <p class="text-xs font-medium">Sin foto o PDF válido</p>
                     </div>`;
                 }
 
@@ -463,13 +535,13 @@
             const recordsWithImages = processedRecords.filter(r => r.photoData);
             
             if (recordsWithImages.length === 0) {
-                alert('No hay imágenes disponibles para empaquetar en ZIP.');
+                alert('No hay imágenes válidas para empaquetar.');
                 return;
             }
 
-            showLoader('Empaquetando imágenes en archivo ZIP...');
+            showLoader('Empaquetando todas las imágenes en ZIP...', 50);
             const zip = new JSZip();
-            const folder = zip.folder("Fotos_Ordenadas_Por_Apellido");
+            const folder = zip.folder("Fotos_Excel_Procesadas");
 
             for (let i = 0; i < recordsWithImages.length; i++) {
                 const rec = recordsWithImages[i];
@@ -481,9 +553,7 @@
                         const blob = await fetch(rec.photoData).then(r => r.blob());
                         folder.file(rec.filename, blob);
                     }
-                } catch (err) {
-                    console.error(`Error al empaquetar la foto de ${rec.displayName}:`, err);
-                }
+                } catch (err) {}
             }
 
             const content = await zip.generateAsync({ type: "blob" });
@@ -491,8 +561,9 @@
             hideLoader();
         });
 
-        function showLoader(msg) {
+        function showLoader(msg, percent) {
             loaderText.textContent = msg;
+            progressBar.style.width = `${percent}%`;
             loader.classList.remove('hidden');
             loader.classList.add('flex');
         }
