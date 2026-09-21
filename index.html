@@ -3,24 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extractor de Fotos Excel Ultra-Rápido</title>
+    <title>Extractor de Fotos Excel - Ultra Rápido</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- SheetJS (Excel Processor) -->
+    <!-- SheetJS (XLSX) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <!-- JSZip (High-speed archiving) -->
+    <!-- JSZip -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- FileSaver -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <!-- PDF.js for fast PDF rendering -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
@@ -29,18 +26,12 @@
     <header class="bg-indigo-600 text-white shadow-md">
         <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div class="flex items-center space-x-3">
-                <div class="bg-emerald-500/20 p-2 rounded-xl border border-emerald-400/30">
-                    <i class="fa-solid fa-bolt text-2xl text-emerald-400"></i>
-                </div>
+                <i class="fa-solid fa-file-excel text-3xl text-emerald-400"></i>
                 <div>
-                    <h1 class="text-xl font-bold leading-tight">Extractor de Fotos Excel <span class="text-xs bg-emerald-500 text-slate-900 font-extrabold px-2 py-0.5 rounded-full uppercase ml-1">Ultra-Rápido</span></h1>
-                    <p class="text-xs text-indigo-200">Formato: APELLIDO 1_APELLIDO 2_Nombre 1_Nombre 2.jpg</p>
+                    <h1 class="text-xl font-bold leading-tight">Extractor de Fotos Excel</h1>
+                    <p class="text-xs text-indigo-200">Formato: APELLIDO 1_APELLIDO 2_Nombre 1_Nombre 2</p>
                 </div>
             </div>
-            <button id="btnOpenGuide" class="bg-indigo-700 hover:bg-indigo-800 text-white text-xs px-3.5 py-2 rounded-lg font-medium transition flex items-center space-x-2 border border-indigo-500 shadow-sm">
-                <i class="fa-brands fa-github text-base"></i>
-                <span>¿Cómo alojar gratis en GitHub?</span>
-            </button>
         </div>
     </header>
 
@@ -54,65 +45,35 @@
                 <div class="text-center pointer-events-none z-0">
                     <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-500 mb-3"></i>
                     <h3 class="text-lg font-semibold text-slate-700">Arrastra tu archivo Excel aquí o haz clic para seleccionar</h3>
-                    <p class="text-xs text-slate-500 mt-1">Soporta columnas: Nombre 1, Nombre 2, APELLIDO 1, APELLIDO 2, FOTO (URLs, base64, embebidas o PDF)</p>
+                    <p class="text-xs text-slate-500 mt-1">Soporta enlaces de fotos o imágenes insertadas en el archivo</p>
                 </div>
-            </div>
-
-            <!-- Format Info Bar -->
-            <div class="mt-4 grid grid-cols-2 md:grid-cols-5 gap-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                <span class="font-semibold text-slate-600 col-span-2 md:col-span-1 flex items-center gap-1">
-                    <i class="fa-solid fa-table text-indigo-500"></i> Columnas:
-                </span>
-                <span class="bg-white px-2 py-1 rounded border border-slate-200 text-center font-mono font-medium">APELLIDO 1</span>
-                <span class="bg-white px-2 py-1 rounded border border-slate-200 text-center font-mono font-medium">APELLIDO 2</span>
-                <span class="bg-white px-2 py-1 rounded border border-slate-200 text-center font-mono font-medium">Nombre 1</span>
-                <span class="bg-white px-2 py-1 rounded border border-slate-200 text-center font-mono font-medium">Nombre 2 | FOTO</span>
-            </div>
-        </div>
-
-        <!-- Progress Container (Visible during processing) -->
-        <div id="progressContainer" class="hidden bg-white rounded-xl border border-indigo-100 p-6 shadow-sm flex flex-col gap-3">
-            <div class="flex justify-between items-center text-sm font-semibold text-slate-700">
-                <div class="flex items-center space-x-2">
-                    <i class="fa-solid fa-spinner fa-spin text-indigo-600"></i>
-                    <span id="progressStatusText">Procesando registros en paralelo...</span>
-                </div>
-                <span id="progressPercentText" class="text-indigo-600 font-mono text-base font-bold">0%</span>
-            </div>
-            
-            <!-- Progress Bar -->
-            <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden p-0.5 border border-slate-200">
-                <div id="progressBar" class="bg-gradient-to-r from-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-150 ease-out w-0"></div>
-            </div>
-
-            <div class="flex justify-between text-xs text-slate-400">
-                <span id="progressDetailsText">Preparando lotes...</span>
-                <span id="progressStatsText">0/0 completados</span>
             </div>
         </div>
 
         <!-- Controls Bar -->
         <div id="controlsBar" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="flex items-center space-x-3 w-full md:w-auto">
-                <div class="relative w-full md:w-72">
+                <div class="relative w-full md:w-64">
                     <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
                     <input type="text" id="searchInput" placeholder="Buscar por nombre o apellido..." class="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
                 <div class="text-xs text-slate-500 font-medium whitespace-nowrap" id="statsCount">
-                    0 registros
+                    0 registros procesados
                 </div>
             </div>
 
             <div class="flex items-center space-x-3 w-full md:w-auto justify-end">
-                <div class="text-xs text-indigo-600 font-semibold bg-indigo-50 px-3 py-2 rounded-lg border border-indigo-100 flex items-center gap-1.5">
-                    <i class="fa-solid fa-arrow-down-a-z"></i>
-                    <span>Orden: APELLIDO 1</span>
-                </div>
                 <button id="btnDownloadZip" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow transition flex items-center space-x-2">
                     <i class="fa-solid fa-file-zipper text-base"></i>
-                    <span>Descargar Todo (.ZIP Instantáneo)</span>
+                    <span>Descargar Todo (.ZIP)</span>
                 </button>
             </div>
+        </div>
+
+        <!-- Progress Spinner & Status Bar -->
+        <div id="loader" class="hidden flex-col items-center justify-center py-12 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+            <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-600 mb-3"></i>
+            <p class="text-slate-700 font-semibold text-sm" id="loaderText">Procesando archivo...</p>
         </div>
 
         <!-- Grid Results -->
@@ -122,53 +83,13 @@
         <div id="emptyState" class="text-center py-12 bg-white rounded-xl border border-slate-200 p-8">
             <i class="fa-solid fa-image text-5xl text-slate-300 mb-3"></i>
             <h3 class="text-base font-semibold text-slate-600">No hay fotos cargadas</h3>
-            <p class="text-xs text-slate-400 mt-1">Carga un archivo Excel para extraer, procesar y descargar las fotografías de forma instantánea.</p>
+            <p class="text-xs text-slate-400 mt-1">Carga un archivo Excel para extraer las fotos.</p>
         </div>
     </main>
 
-    <!-- Canvas para conversiones de PDF -->
-    <canvas id="conversionCanvas" class="hidden"></canvas>
-
-    <!-- Modal Guía GitHub -->
-    <div id="guideModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
-            <div class="bg-indigo-600 text-white px-6 py-4 flex items-center justify-between">
-                <h3 class="font-bold text-lg flex items-center space-x-2">
-                    <i class="fa-brands fa-github text-xl"></i>
-                    <span>Publicar gratis en GitHub Pages</span>
-                </h3>
-                <button id="btnCloseGuide" class="text-indigo-200 hover:text-white text-xl">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-            <div class="p-6 overflow-y-auto space-y-4 text-sm text-slate-600 custom-scrollbar">
-                <p>Para alojar esta aplicación en GitHub y usarla a máxima velocidad sin instalar nada:</p>
-                <ol class="list-decimal pl-5 space-y-3 font-medium">
-                    <li>Guarda este código como un archivo llamado <code class="bg-slate-100 text-indigo-600 px-1.5 py-0.5 rounded font-mono text-xs">index.html</code>.</li>
-                    <li>Crea un repositorio público en <a href="https://github.com" target="_blank" class="text-indigo-600 underline">GitHub.com</a>.</li>
-                    <li>Sube tu archivo <code class="bg-slate-100 text-indigo-600 px-1.5 py-0.5 rounded font-mono text-xs">index.html</code>.</li>
-                    <li>Dirígete a <strong>Settings &gt; Pages</strong>, elige la rama <code class="bg-slate-100 px-1 py-0.5 rounded text-xs">main</code> y guarda.</li>
-                    <li>¡Listo! Tu app estará disponible online de manera permanente.</li>
-                </ol>
-            </div>
-            <div class="bg-slate-50 px-6 py-3 border-t border-slate-100 text-right">
-                <button id="btnCloseGuide2" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition">Entendido</button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // Configuración de PDF.js
-        if (typeof pdfjsLib !== 'undefined') {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        }
-
-        // Estado Global
         let processedRecords = [];
-        const CONCURRENCY_LIMIT = 8; // Concurrencia de descargas
-        const REQUEST_TIMEOUT_MS = 2500; // Timeout estricto de 2.5s por foto
 
-        // Elementos DOM
         const excelInput = document.getElementById('excelInput');
         const dropZone = document.getElementById('dropZone');
         const resultsGrid = document.getElementById('resultsGrid');
@@ -177,203 +98,153 @@
         const statsCount = document.getElementById('statsCount');
         const searchInput = document.getElementById('searchInput');
         const btnDownloadZip = document.getElementById('btnDownloadZip');
-        const conversionCanvas = document.getElementById('conversionCanvas');
-
-        // Elementos de Progreso
-        const progressContainer = document.getElementById('progressContainer');
-        const progressBar = document.getElementById('progressBar');
-        const progressPercentText = document.getElementById('progressPercentText');
-        const progressStatusText = document.getElementById('progressStatusText');
-        const progressDetailsText = document.getElementById('progressDetailsText');
-        const progressStatsText = document.getElementById('progressStatsText');
-
-        // Modal Elements
-        const guideModal = document.getElementById('guideModal');
-        const btnOpenGuide = document.getElementById('btnOpenGuide');
-        const btnCloseGuide = document.getElementById('btnCloseGuide');
-        const btnCloseGuide2 = document.getElementById('btnCloseGuide2');
-
-        btnOpenGuide.addEventListener('click', () => guideModal.classList.remove('hidden'));
-        btnCloseGuide.addEventListener('click', () => guideModal.classList.add('hidden'));
-        btnCloseGuide2.addEventListener('click', () => guideModal.classList.add('hidden'));
+        const loader = document.getElementById('loader');
+        const loaderText = document.getElementById('loaderText');
 
         // Drag & Drop
         ['dragenter', 'dragover'].forEach(name => {
-            dropZone.addEventListener(name, (e) => {
-                e.preventDefault();
-                dropZone.classList.add('border-indigo-500', 'bg-indigo-100/50');
-            });
+            dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.add('bg-indigo-100/50'); });
         });
         ['dragleave', 'drop'].forEach(name => {
-            dropZone.addEventListener(name, (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('border-indigo-500', 'bg-indigo-100/50');
-            });
+            dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.remove('bg-indigo-100/50'); });
         });
 
-        excelInput.addEventListener('change', handleFileSelect);
+        excelInput.addEventListener('change', handleFile);
 
-        async function handleFileSelect(e) {
+        async function handleFile(e) {
             const file = e.target.files[0];
             if (!file) return;
 
-            // Reset UI State
+            showLoader('Leyendo el archivo Excel...');
             processedRecords = [];
-            resultsGrid.innerHTML = '';
-            controlsBar.classList.add('hidden');
-            emptyState.classList.add('hidden');
-            showProgress('Leyendo archivo Excel...', 0, 100);
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
                 const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-                // Extracción ultra-rápida de fotos embebidas en XLSX
-                const embeddedImagesMap = await extractEmbeddedImages(arrayBuffer);
+                // Extraer imágenes embebidas dentro de la estructura ZIP del XLSX
+                const embeddedImages = await extractEmbeddedImages(arrayBuffer);
 
-                const total = rows.length;
-                let completed = 0;
+                for (let index = 0; index < jsonRows.length; index++) {
+                    const row = jsonRows[index];
+                    
+                    const a1 = cleanField(row['APELLIDO 1'] || row['Apellido 1'] || row['Apellido1'] || '');
+                    const a2 = cleanField(row['APELLIDO 2'] || row['Apellido 2'] || row['Apellido2'] || '');
+                    const n1 = cleanField(row['Nombre 1'] || row['NOMBRE 1'] || row['Nombre1'] || '');
+                    const n2 = cleanField(row['Nombre 2'] || row['NOMBRE 2'] || row['Nombre2'] || '');
 
-                // Preparación en memoria de los registros base
-                const prepareTasks = rows.map((row, index) => {
-                    const a1 = clean(row['APELLIDO 1'] || row['Apellido 1'] || row['APELLIDO1'] || row['Apellido1']);
-                    const a2 = clean(row['APELLIDO 2'] || row['Apellido 2'] || row['APELLIDO2'] || row['Apellido2']);
-                    const n1 = clean(row['Nombre 1'] || row['NOMBRE 1'] || row['Nombre1'] || row['NOMBRE1']);
-                    const n2 = clean(row['Nombre 2'] || row['NOMBRE 2'] || row['Nombre2'] || row['NOMBRE2']);
+                    const fullNameParts = [a1, a2, n1, n2].filter(Boolean);
+                    const formattedFilename = fullNameParts.length > 0 
+                        ? fullNameParts.join('_') 
+                        : `Registro_${index + 1}`;
 
-                    const nameParts = [a1, a2, n1, n2].filter(Boolean);
-                    const filenameStr = nameParts.length > 0 ? nameParts.join('_') : `Registro_${index + 1}`;
-                    const displayName = `${a1} ${a2} ${n1} ${n2}`.trim() || `Registro ${index + 1}`;
-                    const rawPhoto = row['FOTO'] || row['Foto'] || row['foto'] || '';
+                    const displayName = `${a1} ${a2} ${n1} ${n2}`.trim() || `Persona ${index + 1}`;
+                    let rawPhoto = row['FOTO'] || row['Foto'] || row['foto'] || '';
+                    let finalBase64Image = null;
 
-                    return {
+                    // 1. Si es URL directa o Base64
+                    if (rawPhoto && typeof rawPhoto === 'string') {
+                        if (rawPhoto.startsWith('data:image')) {
+                            finalBase64Image = rawPhoto;
+                        } else if (rawPhoto.startsWith('http')) {
+                            finalBase64Image = await downloadUrlAsBase64(rawPhoto);
+                        }
+                    }
+
+                    // 2. Si no hay URL, buscar en las imágenes incrustadas del archivo en orden
+                    if (!finalBase64Image && embeddedImages[index]) {
+                        finalBase64Image = embeddedImages[index];
+                    }
+
+                    processedRecords.push({
                         id: index,
                         a1, a2, n1, n2,
-                        filename: `${filenameStr}.jpg`,
-                        displayName: displayName,
-                        rawPhoto: rawPhoto,
-                        embeddedBlobUrl: embeddedImagesMap[index] || null,
-                        photoData: null
-                    };
-                });
-
-                // Ejecución concurrente por lotes (Promise.all con concurrencia de 8)
-                for (let i = 0; i < prepareTasks.length; i += CONCURRENCY_LIMIT) {
-                    const batch = prepareTasks.slice(i, i + CONCURRENCY_LIMIT);
-                    
-                    await Promise.all(batch.map(async (item) => {
-                        let finalPhoto = null;
-
-                        if (item.rawPhoto) {
-                            finalPhoto = await fetchPhotoFast(item.rawPhoto);
-                        }
-
-                        if (!finalPhoto && item.embeddedBlobUrl) {
-                            finalPhoto = await blobUrlToBase64(item.embeddedBlobUrl);
-                        }
-
-                        item.photoData = finalPhoto;
-                        completed++;
-
-                        // Actualización de progreso fluida
-                        const percent = Math.round((completed / total) * 100);
-                        updateProgress(percent, completed, total, `Procesando: ${item.displayName}`);
-                    }));
+                        filename: `${formattedFilename}.jpg`,
+                        photoData: finalBase64Image,
+                        displayName: displayName
+                    });
                 }
 
                 // Ordenar por APELLIDO 1
-                prepareTasks.sort((a, b) => a.a1.localeCompare(b.a1, 'es', { sensitivity: 'base' }));
-                processedRecords = prepareTasks;
+                processedRecords.sort((a, b) => a.a1.localeCompare(b.a1, 'es', { sensitivity: 'base' }));
 
-                hideProgress();
-                
-                // RENDERIZADO ÚNICO DE GOLPE (Cero renderizados intermedios)
-                renderGridBatch(processedRecords);
+                renderGrid(processedRecords);
 
-            } catch (err) {
-                console.error(err);
-                alert('Error al leer el archivo Excel. Revisa el formato e inténtalo de nuevo.');
-                hideProgress();
+            } catch (error) {
+                console.error(error);
+                alert('Ocurrió un error al procesar el archivo Excel.');
             } finally {
+                hideLoader();
                 excelInput.value = '';
             }
         }
 
-        async function fetchPhotoFast(urlStr) {
-            let src = String(urlStr).trim();
-            if (src.startsWith('data:image')) return src;
+        // Descarga imágenes desde URL mediante proxies seguros y rápidos
+        async function downloadUrlAsBase64(urlStr) {
+            let src = urlStr.trim();
 
-            // Formatear enlaces directos de servicios en la nube conocidos
             if (src.includes('drive.google.com')) {
                 const idMatch = src.match(/\/d\/([^\/]+)/) || src.match(/id=([^&]+)/);
                 if (idMatch && idMatch[1]) {
                     src = `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
                 }
-            } else if (src.includes('dropbox.com')) {
-                src = src.replace('dl=0', 'dl=1');
             }
 
-            // Usar CORS proxy rápido directo
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(src)}`;
+            const proxies = [
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(src)}`,
+                `https://corsproxy.io/?${encodeURIComponent(src)}`
+            ];
 
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+            for (const proxy of proxies) {
+                try {
+                    const controller = new AbortController();
+                    const timer = setTimeout(() => controller.abort(), 3500);
 
-            try {
-                // Intento 1: Proxy rápido con AbortController
-                const response = await fetch(proxyUrl, { signal: controller.signal });
-                clearTimeout(timeoutId);
+                    const res = await fetch(proxy, { signal: controller.signal });
+                    clearTimeout(timer);
 
-                if (!response.ok) return null;
-
-                const contentType = response.headers.get('content-type') || '';
-                const arrayBuffer = await response.arrayBuffer();
-
-                if (contentType.includes('pdf') || src.toLowerCase().includes('.pdf') || isPdfBuffer(arrayBuffer)) {
-                    return await renderPdfBufferToJpg(arrayBuffer);
-                } else {
-                    return await bufferToBase64(arrayBuffer);
+                    if (res.ok) {
+                        const blob = await res.blob();
+                        return await blobToBase64(blob);
+                    }
+                } catch (e) {
+                    continue;
                 }
-            } catch (e) {
-                clearTimeout(timeoutId);
-                // Si falla por timeout o CORS, omite para mantener velocidad ultra-rápida
-                return null;
             }
+            return null;
         }
 
-        function isPdfBuffer(buffer) {
-            if (!buffer || buffer.byteLength < 5) return false;
-            const arr = new Uint8Array(buffer.slice(0, 5));
-            const header = String.fromCharCode.apply(null, arr);
-            return header.startsWith('%PDF-');
-        }
-
-        async function renderPdfBufferToJpg(arrayBuffer) {
+        // Extraer fotos directamente del empaquetado XLSX
+        async function extractEmbeddedImages(arrayBuffer) {
+            const imagesList = [];
             try {
-                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-                const pdf = await Promise.race([
-                    loadingTask.promise,
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('PDF Timeout')), 2000))
-                ]);
+                const zip = await JSZip.loadAsync(arrayBuffer);
+                const mediaFiles = Object.keys(zip.files).filter(path => path.startsWith('xl/media/'));
+                
+                // Ordenar por nombre del archivo (image1.png, image2.jpeg, etc.)
+                mediaFiles.sort((a, b) => {
+                    const numA = parseInt(a.replace(/[^0-9]/g, '')) || 0;
+                    const numB = parseInt(b.replace(/[^0-9]/g, '')) || 0;
+                    return numA - numB;
+                });
 
-                const page = await pdf.getPage(1);
-                const viewport = page.getViewport({ scale: 1.2 });
-                const ctx = conversionCanvas.getContext('2d');
-                conversionCanvas.height = viewport.height;
-                conversionCanvas.width = viewport.width;
-
-                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-                return conversionCanvas.toDataURL('image/jpeg', 0.8);
+                for (const filePath of mediaFiles) {
+                    const file = zip.files[filePath];
+                    const blob = await file.async('blob');
+                    const base64 = await blobToBase64(blob);
+                    imagesList.push(base64);
+                }
             } catch (err) {
-                return null;
+                console.warn('No se encontraron imágenes embebidas en el paquete del Excel:', err);
             }
+            return imagesList;
         }
 
-        function bufferToBase64(buffer) {
+        function blobToBase64(blob) {
             return new Promise((resolve) => {
-                const blob = new Blob([buffer], { type: 'image/jpeg' });
                 const reader = new FileReader();
                 reader.onloadend = () => resolve(reader.result);
                 reader.onerror = () => resolve(null);
@@ -381,40 +252,11 @@
             });
         }
 
-        function blobUrlToBase64(blobUrl) {
-            return fetch(blobUrl)
-                .then(r => r.blob())
-                .then(blob => new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result);
-                    reader.onerror = () => resolve(null);
-                    reader.readAsDataURL(blob);
-                }))
-                .catch(() => null);
+        function cleanField(str) {
+            return String(str).trim();
         }
 
-        async function extractEmbeddedImages(arrayBuffer) {
-            const map = {};
-            try {
-                const zip = await JSZip.loadAsync(arrayBuffer);
-                const mediaFiles = Object.keys(zip.files).filter(path => path.startsWith('xl/media/'));
-                mediaFiles.sort();
-
-                for (let i = 0; i < mediaFiles.length; i++) {
-                    const blob = await zip.files[mediaFiles[i]].async('blob');
-                    map[i] = URL.createObjectURL(blob);
-                }
-            } catch (e) {
-                // Sin imágenes comprimidas
-            }
-            return map;
-        }
-
-        function clean(val) {
-            return String(val || '').trim();
-        }
-
-        function renderGridBatch(records) {
+        function renderGrid(records) {
             resultsGrid.innerHTML = '';
 
             if (records.length === 0) {
@@ -425,123 +267,107 @@
 
             emptyState.classList.add('hidden');
             controlsBar.classList.remove('hidden');
-            statsCount.textContent = `${records.length} registros`;
-
-            // DocumentFragment para inserción masiva en 1 sólo repaint
-            const fragment = document.createDocumentFragment();
+            statsCount.textContent = `${records.length} registro(s) encontrados`;
 
             records.forEach(rec => {
                 const card = document.createElement('div');
                 card.className = 'bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between';
 
-                const imgBox = document.createElement('div');
-                imgBox.className = 'w-full h-44 bg-slate-100 flex items-center justify-center overflow-hidden relative border-b border-slate-100';
+                const imgContainer = document.createElement('div');
+                imgContainer.className = 'w-full h-48 bg-slate-100 flex items-center justify-center overflow-hidden relative border-b border-slate-100';
 
                 if (rec.photoData) {
                     const img = document.createElement('img');
                     img.src = rec.photoData;
                     img.alt = rec.displayName;
-                    img.loading = 'lazy';
                     img.className = 'w-full h-full object-cover';
-                    imgBox.appendChild(img);
+                    imgContainer.appendChild(img);
                 } else {
-                    imgBox.innerHTML = `
-                        <div class="text-center p-4 text-slate-400">
-                            <i class="fa-regular fa-image text-3xl mb-1 text-slate-300"></i>
-                            <p class="text-xs">Sin foto / No encontrada</p>
-                        </div>`;
+                    imgContainer.innerHTML = `<div class="text-center p-4 text-slate-400">
+                        <i class="fa-regular fa-image text-3xl mb-1"></i>
+                        <p class="text-xs">Sin foto encontrada</p>
+                    </div>`;
                 }
 
-                const contentBox = document.createElement('div');
-                contentBox.className = 'p-3 flex-grow flex flex-col justify-between';
-                contentBox.innerHTML = `
+                const infoBox = document.createElement('div');
+                infoBox.className = 'p-4 flex-grow flex flex-col justify-between';
+
+                infoBox.innerHTML = `
                     <div>
-                        <h4 class="font-bold text-slate-800 text-xs truncate" title="${rec.displayName}">${rec.displayName}</h4>
-                        <p class="text-[11px] font-mono text-indigo-600 font-semibold mt-0.5 truncate" title="${rec.filename}">${rec.filename}</p>
+                        <h4 class="font-bold text-slate-800 text-sm truncate" title="${rec.displayName}">${rec.displayName}</h4>
+                        <p class="text-xs font-mono text-indigo-600 font-semibold mt-0.5 truncate" title="${rec.filename}">${rec.filename}</p>
                     </div>
                 `;
 
-                const btn = document.createElement('button');
-                btn.className = `mt-2.5 w-full text-xs font-medium py-1.5 rounded-lg flex items-center justify-center space-x-1.5 transition ${
+                const btnDownload = document.createElement('button');
+                btnDownload.className = `mt-3 w-full text-xs font-medium py-2 rounded-lg flex items-center justify-center space-x-2 transition ${
                     rec.photoData 
                         ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700' 
                         : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                 }`;
-                btn.disabled = !rec.photoData;
-                btn.innerHTML = `<i class="fa-solid fa-download"></i> <span>Descargar</span>`;
-
+                btnDownload.disabled = !rec.photoData;
+                btnDownload.innerHTML = `<i class="fa-solid fa-download"></i> <span>Descargar Foto</span>`;
+                
                 if (rec.photoData) {
-                    btn.addEventListener('click', () => saveAs(rec.photoData, rec.filename));
+                    btnDownload.addEventListener('click', () => saveAs(rec.photoData, rec.filename));
                 }
 
-                contentBox.appendChild(btn);
-                card.appendChild(imgBox);
-                card.appendChild(contentBox);
-                fragment.appendChild(card);
+                infoBox.appendChild(btnDownload);
+                card.appendChild(imgContainer);
+                card.appendChild(infoBox);
+                resultsGrid.appendChild(card);
             });
-
-            resultsGrid.appendChild(fragment);
         }
 
-        // Búsqueda en tiempo real rápida
+        // Búsqueda en vivo
         searchInput.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase();
+            const term = e.target.value.toLowerCase();
             const filtered = processedRecords.filter(r => 
-                r.displayName.toLowerCase().includes(query) || 
-                r.filename.toLowerCase().includes(query)
+                r.displayName.toLowerCase().includes(term) || 
+                r.filename.toLowerCase().includes(term)
             );
-            renderGridBatch(filtered);
+            renderGrid(filtered);
         });
 
-        // GENERACIÓN DE ZIP INSTANTÁNEO (Compresión STORE = Sin delay)
+        // DESCARGA EN ZIP
         btnDownloadZip.addEventListener('click', async () => {
             const validRecords = processedRecords.filter(r => r.photoData && r.photoData.startsWith('data:image'));
-
+            
             if (validRecords.length === 0) {
-                alert('No hay fotos válidas disponibles para descargar.');
+                alert('No hay imágenes disponibles para empaquetar.');
                 return;
             }
 
-            showProgress('Generando ZIP instantáneo...', 50, 100);
+            showLoader('Generando archivo ZIP...');
+            const zip = new JSZip();
 
-            setTimeout(async () => {
-                const zip = new JSZip();
-                const folder = zip.folder("Fotos");
+            validRecords.forEach(rec => {
+                const parts = rec.photoData.split(',');
+                if (parts.length === 2) {
+                    zip.file(rec.filename, parts[1], { base64: true });
+                }
+            });
 
-                validRecords.forEach(rec => {
-                    const base64Content = rec.photoData.split(',')[1];
-                    if (base64Content) {
-                        folder.file(rec.filename, base64Content, { base64: true });
-                    }
-                });
-
-                // compression: "STORE" no comprime datos, empaqueta a máxima velocidad en < 1 segundo
-                const zipBlob = await zip.generateAsync({ 
-                    type: "blob", 
-                    compression: "STORE" 
-                });
-
-                saveAs(zipBlob, "Fotos_Excel_Instantaneas.zip");
-                hideProgress();
-            }, 50);
+            try {
+                const content = await zip.generateAsync({ type: "blob" });
+                saveAs(content, "Fotos_Excel_Ordenadas.zip");
+            } catch (e) {
+                console.error(e);
+                alert("Error al comprimir el archivo ZIP.");
+            } finally {
+                hideLoader();
+            }
         });
 
-        // Helpers de Interfaz y Progreso
-        function showProgress(status, current, total) {
-            progressContainer.classList.remove('hidden');
-            updateProgress(Math.round((current / total) * 100), current, total, status);
+        function showLoader(msg) {
+            loaderText.textContent = msg;
+            loader.classList.remove('hidden');
+            loader.classList.add('flex');
         }
 
-        function updateProgress(percent, completed, total, detailStr) {
-            progressBar.style.width = `${percent}%`;
-            progressPercentText.textContent = `${percent}%`;
-            progressStatusText.textContent = percent === 100 ? 'Procesamiento completo' : 'Descargando y procesando fotos...';
-            progressDetailsText.textContent = detailStr || '';
-            progressStatsText.textContent = `${completed}/${total} completados`;
-        }
-
-        function hideProgress() {
-            progressContainer.classList.add('hidden');
+        function hideLoader() {
+            loader.classList.add('hidden');
+            loader.classList.remove('flex');
         }
     </script>
 </body>
