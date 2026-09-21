@@ -3,13 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extractor de Fotos Excel - Rápido y Funcional</title>
+    <title>Extractor de Fotos desde Google Sheets</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- SheetJS (XLSX) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- JSZip -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- FileSaver -->
@@ -21,210 +19,231 @@
     <header class="bg-indigo-600 text-white shadow-md">
         <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div class="flex items-center space-x-3">
-                <i class="fa-solid fa-file-excel text-3xl text-emerald-400"></i>
+                <i class="fa-solid fa-file-csv text-3xl text-emerald-400"></i>
                 <div>
-                    <h1 class="text-xl font-bold leading-tight">Extractor de Fotos Excel</h1>
+                    <h1 class="text-xl font-bold leading-tight">Extractor de Fotos - Google Sheets</h1>
                     <p class="text-xs text-indigo-200">Formato: APELLIDO 1_APELLIDO 2_Nombre 1_Nombre 2.jpg</p>
                 </div>
             </div>
+            <button id="btnReload" class="bg-indigo-500 hover:bg-indigo-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition flex items-center space-x-1">
+                <i class="fa-solid fa-rotate"></i>
+                <span>Sincronizar Google Sheets</span>
+            </button>
         </div>
     </header>
 
     <!-- Main Content -->
     <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6 flex flex-col gap-6">
 
-        <!-- File Upload Area -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <div class="flex flex-col items-center justify-center border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/50 rounded-xl p-8 transition relative" id="dropZone">
-                <input type="file" id="excelInput" accept=".xlsx, .xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
-                <div class="text-center pointer-events-none z-0">
-                    <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-500 mb-3"></i>
-                    <h3 class="text-lg font-semibold text-slate-700">Arrastra tu archivo Excel aquí o haz clic para seleccionar</h3>
-                    <p class="text-xs text-slate-500 mt-1">Soporta URLs, Base64 o imágenes dentro del archivo Excel</p>
-                </div>
-            </div>
-        </div>
-
         <!-- Controls Bar -->
-        <div id="controlsBar" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div id="controlsBar" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="flex items-center space-x-3 w-full md:w-auto">
                 <div class="relative w-full md:w-64">
                     <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
-                    <input type="text" id="searchInput" placeholder="Buscar por nombre o apellido..." class="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <input type="text" id="searchInput" placeholder="Buscar persona..." class="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
                 <div class="text-xs text-slate-500 font-medium whitespace-nowrap" id="statsCount">
-                    0 registros procesados
+                    Cargando datos...
                 </div>
             </div>
 
             <div class="flex items-center space-x-3 w-full md:w-auto justify-end">
                 <button id="btnDownloadZip" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow transition flex items-center space-x-2">
                     <i class="fa-solid fa-file-zipper text-base"></i>
-                    <span>Descargar Todo (.ZIP Instantáneo)</span>
+                    <span>Descargar Todo (.ZIP)</span>
                 </button>
             </div>
         </div>
 
         <!-- Progress Spinner -->
-        <div id="loader" class="hidden flex-col items-center justify-center py-12 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+        <div id="loader" class="flex flex-col items-center justify-center py-12 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
             <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-600 mb-3"></i>
-            <p class="text-slate-700 font-semibold text-sm" id="loaderText">Procesando información...</p>
+            <p class="text-slate-700 font-semibold text-sm" id="loaderText">Conectando con Google Sheets...</p>
         </div>
 
         <!-- Grid Results -->
         <div id="resultsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
 
         <!-- Empty State -->
-        <div id="emptyState" class="text-center py-12 bg-white rounded-xl border border-slate-200 p-8">
-            <i class="fa-solid fa-image text-5xl text-slate-300 mb-3"></i>
-            <h3 class="text-base font-semibold text-slate-600">No hay fotos cargadas</h3>
-            <p class="text-xs text-slate-400 mt-1">Carga un archivo Excel para extraer las fotos de tus registros.</p>
+        <div id="emptyState" class="hidden text-center py-12 bg-white rounded-xl border border-slate-200 p-8">
+            <i class="fa-solid fa-circle-exclamation text-5xl text-amber-400 mb-3"></i>
+            <h3 class="text-base font-semibold text-slate-600">No se encontraron datos</h3>
+            <p class="text-xs text-slate-400 mt-1">Asegúrate de que la Hoja de Google tenga permisos públicos de lectura.</p>
         </div>
     </main>
 
     <script>
+        const SHEET_ID = '1k3p0YhVaFlGYwpUwo5k4pS28oW4h29HKqWOxFh2HE_k';
+        const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+
         let processedRecords = [];
 
-        const excelInput = document.getElementById('excelInput');
-        const dropZone = document.getElementById('dropZone');
         const resultsGrid = document.getElementById('resultsGrid');
         const emptyState = document.getElementById('emptyState');
-        const controlsBar = document.getElementById('controlsBar');
         const statsCount = document.getElementById('statsCount');
         const searchInput = document.getElementById('searchInput');
         const btnDownloadZip = document.getElementById('btnDownloadZip');
+        const btnReload = document.getElementById('btnReload');
         const loader = document.getElementById('loader');
         const loaderText = document.getElementById('loaderText');
 
-        ['dragenter', 'dragover'].forEach(name => {
-            dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.add('bg-indigo-100/50'); });
-        });
-        ['dragleave', 'drop'].forEach(name => {
-            dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.remove('bg-indigo-100/50'); });
-        });
+        document.addEventListener('DOMContentLoaded', fetchGoogleSheetData);
+        btnReload.addEventListener('click', fetchGoogleSheetData);
 
-        excelInput.addEventListener('change', handleFile);
-
-        function handleFile(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            showLoader('Procesando archivo...');
+        async function fetchGoogleSheetData() {
+            showLoader('Obteniendo información de Google Sheets...');
             processedRecords = [];
 
-            // Usar setTimeout para permitir que el DOM renderice el spinner inmediatamente
-            setTimeout(() => {
-                const reader = new FileReader();
-                reader.onload = function(evt) {
-                    try {
-                        const data = new Uint8Array(evt.target.result);
-                        
-                        // 1. Extraer imágenes del ZIP del Excel en segundo plano
-                        JSZip.loadAsync(data).then(zip => {
-                            const mediaFolder = zip.folder("xl/media");
-                            const imagePromises = [];
-                            const mediaFiles = [];
-
-                            if (mediaFolder) {
-                                mediaFolder.forEach((relativePath, fileObj) => {
-                                    if (!fileObj.dir) {
-                                        mediaFiles.push({ path: relativePath, file: fileObj });
-                                    }
-                                });
-
-                                // Ordenar las imágenes numéricamente (image1, image2, etc.)
-                                mediaFiles.sort((a, b) => {
-                                    const numA = parseInt(a.path.replace(/[^0-9]/g, '')) || 0;
-                                    const numB = parseInt(b.path.replace(/[^0-9]/g, '')) || 0;
-                                    return numA - numB;
-                                });
-
-                                mediaFiles.forEach(item => {
-                                    imagePromises.push(item.file.async("base64").then(b64 => "data:image/jpeg;base64," + b64));
-                                });
-                            }
-
-                            Promise.all(imagePromises).then(extractedImages => {
-                                parseExcelData(data, extractedImages);
-                            }).catch(() => {
-                                parseExcelData(data, []);
-                            });
-                        }).catch(() => {
-                            parseExcelData(data, []);
-                        });
-
-                    } catch (err) {
-                        console.error(err);
-                        alert("Error al leer el archivo Excel.");
-                        hideLoader();
-                    }
-                };
-                reader.readAsArrayBuffer(file);
-            }, 50);
-        }
-
-        function parseExcelData(data, extractedImages) {
             try {
-                const workbook = XLSX.read(data, { type: 'array' });
-                const firstSheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[firstSheetName];
-                const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+                const response = await fetch(CSV_URL);
+                if (!response.ok) throw new Error('No se pudo acceder a la Hoja de Google.');
+                
+                const csvText = await response.text();
+                const rows = parseCSV(csvText);
 
-                let imgIndex = 0;
+                if (rows.length < 2) {
+                    hideLoader();
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
 
-                for (let index = 0; index < jsonRows.length; index++) {
-                    const row = jsonRows[index];
+                const headers = rows[0].map(h => cleanStr(h).toUpperCase());
+                
+                const idxA1 = headers.findIndex(h => h.includes('APELLIDO 1') || h.includes('APELLIDO1'));
+                const idxA2 = headers.findIndex(h => h.includes('APELLIDO 2') || h.includes('APELLIDO2'));
+                const idxN1 = headers.findIndex(h => h.includes('NOMBRE 1') || h.includes('NOMBRE1'));
+                const idxN2 = headers.findIndex(h => h.includes('NOMBRE 2') || h.includes('NOMBRE2'));
+                const idxFoto = headers.findIndex(h => h.includes('FOTO') || h.includes('IMAGEN') || h.includes('URL'));
 
-                    const a1 = cleanField(row['APELLIDO 1'] || row['Apellido 1'] || row['Apellido1'] || row['APELLIDO1'] || '');
-                    const a2 = cleanField(row['APELLIDO 2'] || row['Apellido 2'] || row['Apellido2'] || row['APELLIDO2'] || '');
-                    const n1 = cleanField(row['Nombre 1'] || row['NOMBRE 1'] || row['Nombre1'] || row['NOMBRE1'] || '');
-                    const n2 = cleanField(row['Nombre 2'] || row['NOMBRE 2'] || row['Nombre2'] || row['NOMBRE2'] || '');
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (!row || row.length === 0) continue;
+
+                    const a1 = cleanStr(idxA1 !== -1 ? row[idxA1] : '');
+                    const a2 = cleanStr(idxA2 !== -1 ? row[idxA2] : '');
+                    const n1 = cleanStr(idxN1 !== -1 ? row[idxN1] : '');
+                    const n2 = cleanStr(idxN2 !== -1 ? row[idxN2] : '');
+                    let rawFoto = idxFoto !== -1 ? cleanStr(row[idxFoto]) : '';
+
+                    if (!a1 && !a2 && !n1 && !n2 && !rawFoto) continue;
 
                     const fullNameParts = [a1, a2, n1, n2].filter(Boolean);
                     const formattedFilename = fullNameParts.length > 0 
                         ? fullNameParts.join('_') 
-                        : `Registro_${index + 1}`;
+                        : `Registro_${i}`;
 
-                    const displayName = `${a1} ${a2} ${n1} ${n2}`.trim() || `Persona ${index + 1}`;
-                    let rawPhoto = row['FOTO'] || row['Foto'] || row['foto'] || '';
-                    let finalBase64Image = null;
-
-                    // A. Si la celda contiene una cadena Base64 explícita
-                    if (typeof rawPhoto === 'string' && rawPhoto.trim().startsWith('data:image')) {
-                        finalBase64Image = rawPhoto.trim();
-                    }
-
-                    // B. Asignar la imagen extraída de la estructura del Excel
-                    if (!finalBase64Image && extractedImages[imgIndex]) {
-                        finalBase64Image = extractedImages[imgIndex];
-                        imgIndex++;
-                    }
+                    const displayName = `${a1} ${a2} ${n1} ${n2}`.trim() || `Persona ${i}`;
+                    
+                    // Convertir link de Drive a vista previa directa si aplica
+                    let processedPhotoUrl = formatPhotoUrl(rawFoto);
 
                     processedRecords.push({
-                        id: index,
+                        id: i,
                         a1, a2, n1, n2,
                         filename: `${formattedFilename}.jpg`,
-                        photoData: finalBase64Image,
-                        displayName: displayName
+                        photoUrl: processedPhotoUrl,
+                        displayName: displayName,
+                        base64Data: null
                     });
                 }
 
-                // Ordenar alfabéticamente por APELLIDO 1
+                // Ordenar por APELLIDO 1
                 processedRecords.sort((a, b) => a.a1.localeCompare(b.a1, 'es', { sensitivity: 'base' }));
 
                 renderGrid(processedRecords);
+                // Precargar imágenes en segundo plano para permitir exportación en ZIP
+                preloadImagesBase64();
 
-            } catch (e) {
-                console.error(e);
-                alert("Error al procesar las celdas del Excel.");
+            } catch (error) {
+                console.error(error);
+                emptyState.classList.remove('hidden');
+                alert('Ocurrió un error al cargar la hoja de Google Sheets. Revisa que el enlace sea público.');
             } finally {
                 hideLoader();
-                excelInput.value = '';
             }
         }
 
-        function cleanField(str) {
-            return String(str).trim();
+        function formatPhotoUrl(url) {
+            if (!url) return null;
+            let src = url.trim();
+
+            if (src.includes('drive.google.com')) {
+                const idMatch = src.match(/\/d\/([^\/]+)/) || src.match(/id=([^&]+)/);
+                if (idMatch && idMatch[1]) {
+                    return `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
+                }
+            }
+            return src;
+        }
+
+        async function preloadImagesBase64() {
+            for (let rec of processedRecords) {
+                if (rec.photoUrl && !rec.base64Data) {
+                    try {
+                        const base64 = await fetchImageAsBase64(rec.photoUrl);
+                        if (base64) rec.base64Data = base64;
+                    } catch (e) {
+                        console.warn('No se pudo convertir la imagen a base64:', rec.photoUrl);
+                    }
+                }
+            }
+        }
+
+        async function fetchImageAsBase64(url) {
+            const proxies = [
+                `https://corsproxy.io/?${encodeURIComponent(url)}`,
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+            ];
+
+            for (let proxy of proxies) {
+                try {
+                    const res = await fetch(proxy);
+                    if (res.ok) {
+                        const blob = await res.blob();
+                        return await blobToBase64(blob);
+                    }
+                } catch (e) {
+                    continue;
+                }
+            }
+            return null;
+        }
+
+        function blobToBase64(blob) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        function parseCSV(text) {
+            let p = '', c = '', r = [];
+            let q = false;
+            let row = [''];
+            for (let i = 0; i < text.length; i++) {
+                c = text[i];
+                p = text[i - 1];
+                if (c === '"') {
+                    if (q && text[i + 1] === '"') { row[row.length - 1] += '"'; i++; }
+                    else { q = !q; }
+                } else if (c === ',' && !q) {
+                    row.push('');
+                } else if ((c === '\r' || c === '\n') && !q) {
+                    if (c === '\r' && text[i + 1] === '\n') { i++; }
+                    r.push(row);
+                    row = [''];
+                } else {
+                    row[row.length - 1] += c;
+                }
+            }
+            if (row.length > 1 || row[0] !== '') r.push(row);
+            return r;
+        }
+
+        function cleanStr(str) {
+            return String(str || '').trim();
         }
 
         function renderGrid(records) {
@@ -232,12 +251,11 @@
 
             if (records.length === 0) {
                 emptyState.classList.remove('hidden');
-                controlsBar.classList.add('hidden');
+                statsCount.textContent = `0 registros`;
                 return;
             }
 
             emptyState.classList.add('hidden');
-            controlsBar.classList.remove('hidden');
             statsCount.textContent = `${records.length} registro(s) procesados`;
 
             records.forEach(rec => {
@@ -247,16 +265,22 @@
                 const imgContainer = document.createElement('div');
                 imgContainer.className = 'w-full h-48 bg-slate-100 flex items-center justify-center overflow-hidden relative border-b border-slate-100';
 
-                if (rec.photoData) {
+                if (rec.photoUrl) {
                     const img = document.createElement('img');
-                    img.src = rec.photoData;
+                    img.src = rec.photoUrl;
                     img.alt = rec.displayName;
                     img.className = 'w-full h-full object-cover';
+                    img.onerror = () => {
+                        imgContainer.innerHTML = `<div class="text-center p-4 text-slate-400">
+                            <i class="fa-regular fa-image text-3xl mb-1 text-slate-300"></i>
+                            <p class="text-xs">Error de carga de imagen</p>
+                        </div>`;
+                    };
                     imgContainer.appendChild(img);
                 } else {
                     imgContainer.innerHTML = `<div class="text-center p-4 text-slate-400">
                         <i class="fa-regular fa-image text-3xl mb-1"></i>
-                        <p class="text-xs">Sin foto / No encontrada</p>
+                        <p class="text-xs">Sin foto en Google Sheets</p>
                     </div>`;
                 }
 
@@ -272,15 +296,27 @@
 
                 const btnDownload = document.createElement('button');
                 btnDownload.className = `mt-3 w-full text-xs font-medium py-2 rounded-lg flex items-center justify-center space-x-2 transition ${
-                    rec.photoData 
+                    rec.photoUrl 
                         ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700' 
                         : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                 }`;
-                btnDownload.disabled = !rec.photoData;
+                btnDownload.disabled = !rec.photoUrl;
                 btnDownload.innerHTML = `<i class="fa-solid fa-download"></i> <span>Descargar Foto</span>`;
                 
-                if (rec.photoData) {
-                    btnDownload.addEventListener('click', () => saveAs(rec.photoData, rec.filename));
+                if (rec.photoUrl) {
+                    btnDownload.addEventListener('click', async () => {
+                        if (rec.base64Data) {
+                            saveAs(rec.base64Data, rec.filename);
+                        } else {
+                            const b64 = await fetchImageAsBase64(rec.photoUrl);
+                            if (b64) {
+                                rec.base64Data = b64;
+                                saveAs(b64, rec.filename);
+                            } else {
+                                window.open(rec.photoUrl, '_blank');
+                            }
+                        }
+                    });
                 }
 
                 infoBox.appendChild(btnDownload);
@@ -299,9 +335,9 @@
             renderGrid(filtered);
         });
 
-        // DESCARGA EN PAQUETE ZIP
-        btnDownloadZip.addEventListener('click', () => {
-            const validRecords = processedRecords.filter(r => r.photoData && r.photoData.startsWith('data:image'));
+        // DESCARGA ZIP
+        btnDownloadZip.addEventListener('click', async () => {
+            const validRecords = processedRecords.filter(r => r.photoUrl);
             
             if (validRecords.length === 0) {
                 alert('No hay fotos disponibles para descargar.');
@@ -310,25 +346,35 @@
 
             showLoader('Generando paquete ZIP...');
             
-            setTimeout(() => {
-                const zip = new JSZip();
+            const zip = new JSZip();
+            let addedCount = 0;
 
-                validRecords.forEach(rec => {
-                    const parts = rec.photoData.split(',');
+            for (let rec of validRecords) {
+                let base64 = rec.base64Data || await fetchImageAsBase64(rec.photoUrl);
+                if (base64) {
+                    const parts = base64.split(',');
                     if (parts.length === 2) {
                         zip.file(rec.filename, parts[1], { base64: true });
+                        addedCount++;
                     }
-                });
+                }
+            }
 
-                zip.generateAsync({ type: "blob" }).then(content => {
-                    saveAs(content, "Fotos_Excel_Procesadas.zip");
-                    hideLoader();
-                }).catch(err => {
-                    console.error(err);
-                    alert("Error al crear el archivo ZIP.");
-                    hideLoader();
-                });
-            }, 50);
+            if (addedCount === 0) {
+                hideLoader();
+                alert('No se pudieron descargar los binarios de las fotos. Comprueba los permisos de lectura de Google Drive.');
+                return;
+            }
+
+            try {
+                const content = await zip.generateAsync({ type: "blob" });
+                saveAs(content, "Fotos_GoogleSheets.zip");
+            } catch (e) {
+                console.error(e);
+                alert("Error al comprimir el archivo ZIP.");
+            } finally {
+                hideLoader();
+            }
         });
 
         function showLoader(msg) {
