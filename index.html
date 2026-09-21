@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extractor de Fotos Excel - Ultra Rápido</title>
+    <title>Extractor de Fotos Excel (Definitivo)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
@@ -14,11 +14,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- FileSaver -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <style>
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-    </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
 
@@ -29,7 +24,7 @@
                 <i class="fa-solid fa-file-excel text-3xl text-emerald-400"></i>
                 <div>
                     <h1 class="text-xl font-bold leading-tight">Extractor de Fotos Excel</h1>
-                    <p class="text-xs text-indigo-200">Formato: APELLIDO 1_APELLIDO 2_Nombre 1_Nombre 2</p>
+                    <p class="text-xs text-indigo-200">Nomenclatura: APELLIDO 1_APELLIDO 2_Nombre 1_Nombre 2</p>
                 </div>
             </div>
         </div>
@@ -45,7 +40,7 @@
                 <div class="text-center pointer-events-none z-0">
                     <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-500 mb-3"></i>
                     <h3 class="text-lg font-semibold text-slate-700">Arrastra tu archivo Excel aquí o haz clic para seleccionar</h3>
-                    <p class="text-xs text-slate-500 mt-1">Soporta enlaces de fotos o imágenes insertadas en el archivo</p>
+                    <p class="text-xs text-slate-500 mt-1">Soporta URLs, Base64 o fotos insertadas directamente en celdas</p>
                 </div>
             </div>
         </div>
@@ -58,22 +53,22 @@
                     <input type="text" id="searchInput" placeholder="Buscar por nombre o apellido..." class="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
                 <div class="text-xs text-slate-500 font-medium whitespace-nowrap" id="statsCount">
-                    0 registros procesados
+                    0 registros cargados
                 </div>
             </div>
 
             <div class="flex items-center space-x-3 w-full md:w-auto justify-end">
                 <button id="btnDownloadZip" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow transition flex items-center space-x-2">
                     <i class="fa-solid fa-file-zipper text-base"></i>
-                    <span>Descargar Todo (.ZIP)</span>
+                    <span>Descargar Todo (.ZIP Instantáneo)</span>
                 </button>
             </div>
         </div>
 
-        <!-- Progress Spinner & Status Bar -->
+        <!-- Progress Spinner -->
         <div id="loader" class="hidden flex-col items-center justify-center py-12 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
             <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-600 mb-3"></i>
-            <p class="text-slate-700 font-semibold text-sm" id="loaderText">Procesando archivo...</p>
+            <p class="text-slate-700 font-semibold text-sm" id="loaderText">Extrayendo imágenes y procesando datos...</p>
         </div>
 
         <!-- Grid Results -->
@@ -83,7 +78,7 @@
         <div id="emptyState" class="text-center py-12 bg-white rounded-xl border border-slate-200 p-8">
             <i class="fa-solid fa-image text-5xl text-slate-300 mb-3"></i>
             <h3 class="text-base font-semibold text-slate-600">No hay fotos cargadas</h3>
-            <p class="text-xs text-slate-400 mt-1">Carga un archivo Excel para extraer las fotos.</p>
+            <p class="text-xs text-slate-400 mt-1">Carga un archivo Excel para extraer las fotos de tus registros.</p>
         </div>
     </main>
 
@@ -101,7 +96,6 @@
         const loader = document.getElementById('loader');
         const loaderText = document.getElementById('loaderText');
 
-        // Drag & Drop
         ['dragenter', 'dragover'].forEach(name => {
             dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.add('bg-indigo-100/50'); });
         });
@@ -115,37 +109,39 @@
             const file = e.target.files[0];
             if (!file) return;
 
-            showLoader('Leyendo el archivo Excel...');
+            showLoader('Leyendo el archivo Excel y mapeando estructura...');
             processedRecords = [];
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
+                
+                // 1. Mapeo profundo de imágenes físicas dentro del ZIP de OpenXML
+                const embeddedImagesMap = await extractOpenXMLImagesMap(arrayBuffer);
+
+                // 2. Lectura de datos estructurados de SheetJS
                 const workbook = XLSX.read(arrayBuffer, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-                // Extraer imágenes embebidas dentro de la estructura ZIP del XLSX
-                const embeddedImages = await extractEmbeddedImages(arrayBuffer);
-
                 for (let index = 0; index < jsonRows.length; index++) {
                     const row = jsonRows[index];
-                    
-                    const a1 = cleanField(row['APELLIDO 1'] || row['Apellido 1'] || row['Apellido1'] || '');
-                    const a2 = cleanField(row['APELLIDO 2'] || row['Apellido 2'] || row['Apellido2'] || '');
-                    const n1 = cleanField(row['Nombre 1'] || row['NOMBRE 1'] || row['Nombre1'] || '');
-                    const n2 = cleanField(row['Nombre 2'] || row['NOMBRE 2'] || row['Nombre2'] || '');
+
+                    const a1 = cleanField(row['APELLIDO 1'] || row['Apellido 1'] || row['Apellido1'] || row['APELLIDO1'] || '');
+                    const a2 = cleanField(row['APELLIDO 2'] || row['Apellido 2'] || row['Apellido2'] || row['APELLIDO2'] || '');
+                    const n1 = cleanField(row['Nombre 1'] || row['NOMBRE 1'] || row['Nombre1'] || row['NOMBRE1'] || '');
+                    const n2 = cleanField(row['Nombre 2'] || row['NOMBRE 2'] || row['Nombre2'] || row['NOMBRE2'] || '');
 
                     const fullNameParts = [a1, a2, n1, n2].filter(Boolean);
                     const formattedFilename = fullNameParts.length > 0 
                         ? fullNameParts.join('_') 
-                        : `Registro_${index + 1}`;
+                        : `Persona_${index + 1}`;
 
                     const displayName = `${a1} ${a2} ${n1} ${n2}`.trim() || `Persona ${index + 1}`;
                     let rawPhoto = row['FOTO'] || row['Foto'] || row['foto'] || '';
                     let finalBase64Image = null;
 
-                    // 1. Si es URL directa o Base64
+                    // Prioridad A: URL en la columna FOTO
                     if (rawPhoto && typeof rawPhoto === 'string') {
                         if (rawPhoto.startsWith('data:image')) {
                             finalBase64Image = rawPhoto;
@@ -154,9 +150,14 @@
                         }
                     }
 
-                    // 2. Si no hay URL, buscar en las imágenes incrustadas del archivo en orden
-                    if (!finalBase64Image && embeddedImages[index]) {
-                        finalBase64Image = embeddedImages[index];
+                    // Prioridad B: Mapeo de imagen incrustada por índice de fila (Fila Excel = Index + 2 considerando encabezado)
+                    const excelRowIndex = index + 2; 
+                    if (!finalBase64Image) {
+                        if (embeddedImagesMap[excelRowIndex]) {
+                            finalBase64Image = embeddedImagesMap[excelRowIndex];
+                        } else if (embeddedImagesMap[index]) {
+                            finalBase64Image = embeddedImagesMap[index];
+                        }
                     }
 
                     processedRecords.push({
@@ -182,10 +183,81 @@
             }
         }
 
-        // Descarga imágenes desde URL mediante proxies seguros y rápidos
+        // Analizador de imágenes OpenXML (Drawing.xml + Rels)
+        async function extractOpenXMLImagesMap(arrayBuffer) {
+            const rowImageMap = {};
+            try {
+                const zip = await JSZip.loadAsync(arrayBuffer);
+                const mediaFiles = Object.keys(zip.files).filter(path => path.startsWith('xl/media/'));
+                
+                if (mediaFiles.length === 0) return rowImageMap;
+
+                // Extraer binarios a Base64
+                const mediaBase64 = {};
+                for (const mediaPath of mediaFiles) {
+                    const blob = await zip.files[mediaPath].async('blob');
+                    const fileName = mediaPath.split('/').pop();
+                    mediaBase64[fileName] = await blobToBase64(blob);
+                }
+
+                // Intentar leer drawing1.xml.rels para conocer la relación interna
+                const relsFile = zip.files['xl/drawings/_rels/drawing1.xml.rels'];
+                const drawingFile = zip.files['xl/drawings/drawing1.xml'];
+
+                if (relsFile && drawingFile) {
+                    const relsXmlText = await relsFile.async('string');
+                    const drawingXmlText = await drawingFile.async('string');
+
+                    const parser = new DOMParser();
+                    const relsDoc = parser.parseFromString(relsXmlText, 'text/xml');
+                    const drawingDoc = parser.parseFromString(drawingXmlText, 'text/xml');
+
+                    // Mapear RId a Nombre de archivo de imagen
+                    const ridToImage = {};
+                    const relElements = relsDoc.getElementsByTagName('Relationship');
+                    for (let i = 0; i < relElements.length; i++) {
+                        const id = relElements[i].getAttribute('Id');
+                        const target = relElements[i].getAttribute('Target').split('/').pop();
+                        ridToImage[id] = target;
+                    }
+
+                    // Mapear posición de Fila en Drawing XML (xdr:from/xdr:row)
+                    const anchors = drawingDoc.querySelectorAll('twoCellAnchor, oneCellAnchor');
+                    anchors.forEach(anchor => {
+                        const rowElem = anchor.querySelector('from > row');
+                        const blipElem = anchor.querySelector('blip');
+                        if (rowElem && blipElem) {
+                            const rowIndex = parseInt(rowElem.textContent) + 1; // Ajuste a fila base 1
+                            const embedId = blipElem.getAttribute('r:embed');
+                            const imageName = ridToImage[embedId];
+                            if (imageName && mediaBase64[imageName]) {
+                                rowImageMap[rowIndex] = mediaBase64[imageName];
+                            }
+                        }
+                    });
+                }
+
+                // Si la estructura de drawing no pudo asociar filas, fallback ordenado por índice de archivo
+                if (Object.keys(rowImageMap).length === 0) {
+                    mediaFiles.sort((a, b) => {
+                        const numA = parseInt(a.replace(/[^0-9]/g, '')) || 0;
+                        const numB = parseInt(b.replace(/[^0-9]/g, '')) || 0;
+                        return numA - numB;
+                    });
+                    mediaFiles.forEach((path, idx) => {
+                        const fileName = path.split('/').pop();
+                        rowImageMap[idx] = mediaBase64[fileName];
+                    });
+                }
+
+            } catch (err) {
+                console.warn('Extracción OpenXML fallida o no soportada:', err);
+            }
+            return rowImageMap;
+        }
+
         async function downloadUrlAsBase64(urlStr) {
             let src = urlStr.trim();
-
             if (src.includes('drive.google.com')) {
                 const idMatch = src.match(/\/d\/([^\/]+)/) || src.match(/id=([^&]+)/);
                 if (idMatch && idMatch[1]) {
@@ -201,11 +273,9 @@
             for (const proxy of proxies) {
                 try {
                     const controller = new AbortController();
-                    const timer = setTimeout(() => controller.abort(), 3500);
-
+                    const timer = setTimeout(() => controller.abort(), 3000);
                     const res = await fetch(proxy, { signal: controller.signal });
                     clearTimeout(timer);
-
                     if (res.ok) {
                         const blob = await res.blob();
                         return await blobToBase64(blob);
@@ -215,32 +285,6 @@
                 }
             }
             return null;
-        }
-
-        // Extraer fotos directamente del empaquetado XLSX
-        async function extractEmbeddedImages(arrayBuffer) {
-            const imagesList = [];
-            try {
-                const zip = await JSZip.loadAsync(arrayBuffer);
-                const mediaFiles = Object.keys(zip.files).filter(path => path.startsWith('xl/media/'));
-                
-                // Ordenar por nombre del archivo (image1.png, image2.jpeg, etc.)
-                mediaFiles.sort((a, b) => {
-                    const numA = parseInt(a.replace(/[^0-9]/g, '')) || 0;
-                    const numB = parseInt(b.replace(/[^0-9]/g, '')) || 0;
-                    return numA - numB;
-                });
-
-                for (const filePath of mediaFiles) {
-                    const file = zip.files[filePath];
-                    const blob = await file.async('blob');
-                    const base64 = await blobToBase64(blob);
-                    imagesList.push(base64);
-                }
-            } catch (err) {
-                console.warn('No se encontraron imágenes embebidas en el paquete del Excel:', err);
-            }
-            return imagesList;
         }
 
         function blobToBase64(blob) {
@@ -267,7 +311,7 @@
 
             emptyState.classList.add('hidden');
             controlsBar.classList.remove('hidden');
-            statsCount.textContent = `${records.length} registro(s) encontrados`;
+            statsCount.textContent = `${records.length} registro(s) procesados`;
 
             records.forEach(rec => {
                 const card = document.createElement('div');
@@ -319,7 +363,6 @@
             });
         }
 
-        // Búsqueda en vivo
         searchInput.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
             const filtered = processedRecords.filter(r => 
@@ -329,12 +372,12 @@
             renderGrid(filtered);
         });
 
-        // DESCARGA EN ZIP
+        // DESCARGA DE ZIP GARANTIZADA Y COMPLETA
         btnDownloadZip.addEventListener('click', async () => {
             const validRecords = processedRecords.filter(r => r.photoData && r.photoData.startsWith('data:image'));
             
             if (validRecords.length === 0) {
-                alert('No hay imágenes disponibles para empaquetar.');
+                alert('No se encontraron imágenes válidas para empaquetar.');
                 return;
             }
 
@@ -353,7 +396,7 @@
                 saveAs(content, "Fotos_Excel_Ordenadas.zip");
             } catch (e) {
                 console.error(e);
-                alert("Error al comprimir el archivo ZIP.");
+                alert("Error al empaquetar el archivo ZIP.");
             } finally {
                 hideLoader();
             }
