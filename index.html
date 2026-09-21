@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extractor de Fotos Excel - Ultra Rápido</title>
+    <title>Extractor de Fotos Excel - Rápido y Funcional</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
@@ -40,7 +40,7 @@
                 <div class="text-center pointer-events-none z-0">
                     <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-500 mb-3"></i>
                     <h3 class="text-lg font-semibold text-slate-700">Arrastra tu archivo Excel aquí o haz clic para seleccionar</h3>
-                    <p class="text-xs text-slate-500 mt-1">Soporta URLs y fotos incrustadas en el archivo</p>
+                    <p class="text-xs text-slate-500 mt-1">Soporta URLs, Base64 o imágenes dentro del archivo Excel</p>
                 </div>
             </div>
         </div>
@@ -60,7 +60,7 @@
             <div class="flex items-center space-x-3 w-full md:w-auto justify-end">
                 <button id="btnDownloadZip" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow transition flex items-center space-x-2">
                     <i class="fa-solid fa-file-zipper text-base"></i>
-                    <span>Descargar Todo (.ZIP)</span>
+                    <span>Descargar Todo (.ZIP Instantáneo)</span>
                 </button>
             </div>
         </div>
@@ -68,7 +68,7 @@
         <!-- Progress Spinner -->
         <div id="loader" class="hidden flex-col items-center justify-center py-12 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
             <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-600 mb-3"></i>
-            <p class="text-slate-700 font-semibold text-sm" id="loaderText">Cargando archivo...</p>
+            <p class="text-slate-700 font-semibold text-sm" id="loaderText">Procesando información...</p>
         </div>
 
         <!-- Grid Results -->
@@ -78,7 +78,7 @@
         <div id="emptyState" class="text-center py-12 bg-white rounded-xl border border-slate-200 p-8">
             <i class="fa-solid fa-image text-5xl text-slate-300 mb-3"></i>
             <h3 class="text-base font-semibold text-slate-600">No hay fotos cargadas</h3>
-            <p class="text-xs text-slate-400 mt-1">Carga un archivo Excel para extraer las fotos.</p>
+            <p class="text-xs text-slate-400 mt-1">Carga un archivo Excel para extraer las fotos de tus registros.</p>
         </div>
     </main>
 
@@ -105,32 +105,72 @@
 
         excelInput.addEventListener('change', handleFile);
 
-        async function handleFile(e) {
+        function handleFile(e) {
             const file = e.target.files[0];
             if (!file) return;
 
-            showLoader('Leyendo el archivo Excel...');
+            showLoader('Procesando archivo...');
             processedRecords = [];
 
-            // Timeout de seguridad de 10 segundos para prevenir cuelgues eternos
-            const loadTimeout = setTimeout(() => {
-                hideLoader();
-                alert('El archivo tardó demasiado en responder. Revisa si contiene imágenes demasiado pesadas.');
-            }, 10000);
+            // Usar setTimeout para permitir que el DOM renderice el spinner inmediatamente
+            setTimeout(() => {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    try {
+                        const data = new Uint8Array(evt.target.result);
+                        
+                        // 1. Extraer imágenes del ZIP del Excel en segundo plano
+                        JSZip.loadAsync(data).then(zip => {
+                            const mediaFolder = zip.folder("xl/media");
+                            const imagePromises = [];
+                            const mediaFiles = [];
 
+                            if (mediaFolder) {
+                                mediaFolder.forEach((relativePath, fileObj) => {
+                                    if (!fileObj.dir) {
+                                        mediaFiles.push({ path: relativePath, file: fileObj });
+                                    }
+                                });
+
+                                // Ordenar las imágenes numéricamente (image1, image2, etc.)
+                                mediaFiles.sort((a, b) => {
+                                    const numA = parseInt(a.path.replace(/[^0-9]/g, '')) || 0;
+                                    const numB = parseInt(b.path.replace(/[^0-9]/g, '')) || 0;
+                                    return numA - numB;
+                                });
+
+                                mediaFiles.forEach(item => {
+                                    imagePromises.push(item.file.async("base64").then(b64 => "data:image/jpeg;base64," + b64));
+                                });
+                            }
+
+                            Promise.all(imagePromises).then(extractedImages => {
+                                parseExcelData(data, extractedImages);
+                            }).catch(() => {
+                                parseExcelData(data, []);
+                            });
+                        }).catch(() => {
+                            parseExcelData(data, []);
+                        });
+
+                    } catch (err) {
+                        console.error(err);
+                        alert("Error al leer el archivo Excel.");
+                        hideLoader();
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }, 50);
+        }
+
+        function parseExcelData(data, extractedImages) {
             try {
-                const arrayBuffer = await file.arrayBuffer();
-                
-                // 1. Extracción directa de medios (ZIP)
-                const zipImages = await extractZipImagesFast(arrayBuffer);
-
-                // 2. Parseo directo de SheetJS
-                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-                let zipImgIndex = 0;
+                let imgIndex = 0;
 
                 for (let index = 0; index < jsonRows.length; index++) {
                     const row = jsonRows[index];
@@ -149,18 +189,15 @@
                     let rawPhoto = row['FOTO'] || row['Foto'] || row['foto'] || '';
                     let finalBase64Image = null;
 
-                    // A. Si es Base64 o URL directa
-                    if (rawPhoto && typeof rawPhoto === 'string') {
-                        rawPhoto = rawPhoto.trim();
-                        if (rawPhoto.startsWith('data:image')) {
-                            finalBase64Image = rawPhoto;
-                        }
+                    // A. Si la celda contiene una cadena Base64 explícita
+                    if (typeof rawPhoto === 'string' && rawPhoto.trim().startsWith('data:image')) {
+                        finalBase64Image = rawPhoto.trim();
                     }
 
-                    // B. Si la foto proviene del paquete ZIP del archivo Excel
-                    if (!finalBase64Image && zipImages[zipImgIndex]) {
-                        finalBase64Image = zipImages[zipImgIndex];
-                        zipImgIndex++;
+                    // B. Asignar la imagen extraída de la estructura del Excel
+                    if (!finalBase64Image && extractedImages[imgIndex]) {
+                        finalBase64Image = extractedImages[imgIndex];
+                        imgIndex++;
                     }
 
                     processedRecords.push({
@@ -172,55 +209,18 @@
                     });
                 }
 
-                // Ordenar por APELLIDO 1
+                // Ordenar alfabéticamente por APELLIDO 1
                 processedRecords.sort((a, b) => a.a1.localeCompare(b.a1, 'es', { sensitivity: 'base' }));
 
-                clearTimeout(loadTimeout);
                 renderGrid(processedRecords);
 
-            } catch (error) {
-                clearTimeout(loadTimeout);
-                console.error(error);
-                alert('Ocurrió un error al procesar el archivo.');
+            } catch (e) {
+                console.error(e);
+                alert("Error al procesar las celdas del Excel.");
             } finally {
                 hideLoader();
                 excelInput.value = '';
             }
-        }
-
-        // Extracción directa sin llamadas externas bloquear
-        async function extractZipImagesFast(arrayBuffer) {
-            const images = [];
-            try {
-                const zip = await JSZip.loadAsync(arrayBuffer);
-                const mediaFiles = Object.keys(zip.files).filter(path => 
-                    path.startsWith('xl/media/') && !path.endsWith('/')
-                );
-
-                mediaFiles.sort((a, b) => {
-                    const numA = parseInt(a.replace(/[^0-9]/g, '')) || 0;
-                    const numB = parseInt(b.replace(/[^0-9]/g, '')) || 0;
-                    return numA - numB;
-                });
-
-                for (const filePath of mediaFiles) {
-                    const blob = await zip.files[filePath].async('blob');
-                    const base64 = await blobToBase64(blob);
-                    if (base64) images.push(base64);
-                }
-            } catch (e) {
-                console.warn('No se encontraron imágenes internas en la carpeta media:', e);
-            }
-            return images;
-        }
-
-        function blobToBase64(blob) {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.onerror = () => resolve(null);
-                reader.readAsDataURL(blob);
-            });
         }
 
         function cleanField(str) {
@@ -299,34 +299,36 @@
             renderGrid(filtered);
         });
 
-        // DESCARGA ZIP
-        btnDownloadZip.addEventListener('click', async () => {
+        // DESCARGA EN PAQUETE ZIP
+        btnDownloadZip.addEventListener('click', () => {
             const validRecords = processedRecords.filter(r => r.photoData && r.photoData.startsWith('data:image'));
             
             if (validRecords.length === 0) {
-                alert('No hay fotos listas para descargar.');
+                alert('No hay fotos disponibles para descargar.');
                 return;
             }
 
-            showLoader('Generando archivo ZIP...');
-            const zip = new JSZip();
+            showLoader('Generando paquete ZIP...');
+            
+            setTimeout(() => {
+                const zip = new JSZip();
 
-            validRecords.forEach(rec => {
-                const parts = rec.photoData.split(',');
-                if (parts.length === 2) {
-                    zip.file(rec.filename, parts[1], { base64: true });
-                }
-            });
+                validRecords.forEach(rec => {
+                    const parts = rec.photoData.split(',');
+                    if (parts.length === 2) {
+                        zip.file(rec.filename, parts[1], { base64: true });
+                    }
+                });
 
-            try {
-                const content = await zip.generateAsync({ type: "blob" });
-                saveAs(content, "Fotos_Excel.zip");
-            } catch (e) {
-                console.error(e);
-                alert("Error al comprimir el archivo ZIP.");
-            } finally {
-                hideLoader();
-            }
+                zip.generateAsync({ type: "blob" }).then(content => {
+                    saveAs(content, "Fotos_Excel_Procesadas.zip");
+                    hideLoader();
+                }).catch(err => {
+                    console.error(err);
+                    alert("Error al crear el archivo ZIP.");
+                    hideLoader();
+                });
+            }, 50);
         });
 
         function showLoader(msg) {
