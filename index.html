@@ -36,9 +36,9 @@
                     <p class="text-xs text-indigo-200">Formato automático: APELLIDO 1_APELLIDO 2_Nombre 1_Nombre 2.jpg</p>
                 </div>
             </div>
-            <div class="text-xs text-indigo-100 bg-indigo-700/60 px-3 py-1.5 rounded-lg border border-indigo-500/40">
-                <i class="fa-solid fa-shield-halved text-emerald-300 mr-1"></i>
-                Procesamiento Paralelo Ultra-Rápido
+            <div class="text-xs text-indigo-100 bg-indigo-700/60 px-3 py-1.5 rounded-lg border border-indigo-500/40 flex items-center gap-2">
+                <i class="fa-solid fa-shield-halved text-emerald-300"></i>
+                <span>Extracción Directa Canvas / High Reliability ZIP</span>
             </div>
         </div>
     </header>
@@ -69,7 +69,7 @@
             <div class="flex justify-between items-center text-sm font-semibold text-slate-700">
                 <div class="flex items-center space-x-2">
                     <i id="progressIcon" class="fa-solid fa-spinner fa-spin text-indigo-600 text-lg"></i>
-                    <span id="progressStatusText">Procesando registros en paralelo...</span>
+                    <span id="progressStatusText">Procesando registros...</span>
                 </div>
                 <span id="progressPercentText" class="text-indigo-600 font-mono text-base font-bold">0%</span>
             </div>
@@ -80,7 +80,7 @@
             </div>
 
             <div class="flex justify-between items-center text-xs text-slate-500">
-                <span id="progressDetailsText">Preparando descarga de fotos...</span>
+                <span id="progressDetailsText">Preparando empaquetado de fotos...</span>
                 <div class="flex items-center gap-3">
                     <span id="progressStatsText" class="font-mono font-semibold text-slate-600">0/0 completados</span>
                     <button id="btnCancelZip" class="hidden text-xs text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded font-medium border border-rose-200 transition">
@@ -109,7 +109,7 @@
                 </div>
                 <button id="btnDownloadZip" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow transition flex items-center space-x-2">
                     <i class="fa-solid fa-file-zipper text-base"></i>
-                    <span>Descargar Todo (.ZIP Ultra-Rápido)</span>
+                    <span>Descargar Todo (.ZIP Garantizado)</span>
                 </button>
             </div>
         </div>
@@ -128,15 +128,12 @@
     </main>
 
     <script>
-        // Configuración de Concurrencia y Tiempos Límites
-        const CONCURRENCY_LIMIT = 8;        // Procesamiento simultáneo de 8 imágenes a la vez
-        const IMAGE_FETCH_TIMEOUT_MS = 3500; // Timeout máximo por imagen (3.5 segundos)
+        const CONCURRENCY_LIMIT = 8;
+        const IMAGE_FETCH_TIMEOUT_MS = 3000;
 
-        // Estado Global de la App
         let processedRecords = [];
         let isZipCancelled = false;
 
-        // Elementos DOM principales
         const sheetUrlInput = document.getElementById('sheetUrlInput');
         const btnProcessUrl = document.getElementById('btnProcessUrl');
         const resultsGrid = document.getElementById('resultsGrid');
@@ -148,7 +145,6 @@
         const btnCancelZip = document.getElementById('btnCancelZip');
         const columnDetectionBadge = document.getElementById('columnDetectionBadge');
 
-        // Elementos de la Barra de Progreso
         const progressContainer = document.getElementById('progressContainer');
         const progressBar = document.getElementById('progressBar');
         const progressPercentText = document.getElementById('progressPercentText');
@@ -157,7 +153,6 @@
         const progressStatsText = document.getElementById('progressStatsText');
         const progressIcon = document.getElementById('progressIcon');
 
-        // Event Listeners
         btnProcessUrl.addEventListener('click', processSheetUrl);
         sheetUrlInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') processSheetUrl();
@@ -189,7 +184,7 @@
             try {
                 const response = await fetch(csvExportUrl);
                 if (!response.ok) {
-                    throw new Error('No se pudo acceder a la hoja. Asegúrate de que tenga permisos de lectura "Cualquier persona con el enlace".');
+                    throw new Error('No se pudo acceder a la hoja.');
                 }
 
                 const csvText = await response.text();
@@ -237,11 +232,11 @@
                         filename: `${formattedFilename}.jpg`,
                         photoUrl: processedPhotoUrl,
                         displayName: displayName,
-                        base64Data: null
+                        base64Data: null,
+                        imgRef: null
                     });
                 }
 
-                // Ordenar alfabéticamente por APELLIDO 1
                 processedRecords.sort((a, b) => a.a1.localeCompare(b.a1, 'es', { sensitivity: 'base' }));
 
                 hideProgress();
@@ -319,15 +314,25 @@
 
                 if (rec.photoUrl) {
                     const img = document.createElement('img');
+                    img.crossOrigin = 'anonymous'; // Permitir extracción Canvas
                     img.src = rec.photoUrl;
                     img.alt = rec.displayName;
-                    img.loading = 'lazy';
                     img.className = 'w-full h-full object-cover';
+                    
+                    rec.imgRef = img; // Guardar referencia al elemento renderizado
+
                     img.onerror = () => {
-                        imgContainer.innerHTML = `<div class="text-center p-4 text-slate-400">
-                            <i class="fa-regular fa-image text-3xl mb-1 text-slate-300"></i>
-                            <p class="text-xs">Sin vista previa / No accesible</p>
-                        </div>`;
+                        // Fallback proxy si falla la vista previa directa
+                        const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(rec.photoUrl)}`;
+                        if (img.src !== proxyUrl) {
+                            img.src = proxyUrl;
+                        } else {
+                            imgContainer.innerHTML = `<div class="text-center p-4 text-slate-400">
+                                <i class="fa-regular fa-image text-3xl mb-1 text-slate-300"></i>
+                                <p class="text-xs">Sin vista previa / No accesible</p>
+                            </div>`;
+                            rec.imgRef = null;
+                        }
                     };
                     imgContainer.appendChild(img);
                 } else {
@@ -358,19 +363,14 @@
                 
                 if (rec.photoUrl) {
                     btnDownload.addEventListener('click', async () => {
-                        if (rec.base64Data) {
-                            saveAs(rec.base64Data, rec.filename);
+                        btnDownload.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Obteniendo...</span>`;
+                        const b64 = await extractImageBase64(rec);
+                        if (b64) {
+                            saveAs(b64, rec.filename);
+                            btnDownload.innerHTML = `<i class="fa-solid fa-check text-emerald-600"></i> <span>Completado</span>`;
                         } else {
-                            btnDownload.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Obteniendo...</span>`;
-                            const b64 = await fetchImageWithTimeout(rec.photoUrl, IMAGE_FETCH_TIMEOUT_MS);
-                            if (b64) {
-                                rec.base64Data = b64;
-                                saveAs(b64, rec.filename);
-                                btnDownload.innerHTML = `<i class="fa-solid fa-check text-emerald-600"></i> <span>Completado</span>`;
-                            } else {
-                                window.open(rec.photoUrl, '_blank');
-                                btnDownload.innerHTML = `<i class="fa-solid fa-arrow-up-right-from-square"></i> <span>Abrir enlace</span>`;
-                            }
+                            window.open(rec.photoUrl, '_blank');
+                            btnDownload.innerHTML = `<i class="fa-solid fa-arrow-up-right-from-square"></i> <span>Abrir enlace</span>`;
                         }
                     });
                 }
@@ -384,16 +384,37 @@
             resultsGrid.appendChild(fragment);
         }
 
-        // Descargar imagen con timeout estricto para evitar bloqueos colapsados
-        async function fetchImageWithTimeout(url, timeoutMs) {
+        async function extractImageBase64(rec) {
+            if (rec.base64Data) return rec.base64Data;
+
+            // Método 1: Captura directa desde Canvas DOM
+            if (rec.imgRef && rec.imgRef.complete && rec.imgRef.naturalWidth > 0) {
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = rec.imgRef.naturalWidth;
+                    canvas.height = rec.imgRef.naturalHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(rec.imgRef, 0, 0);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+                    if (dataUrl && dataUrl.length > 500) {
+                        rec.base64Data = dataUrl;
+                        return dataUrl;
+                    }
+                } catch (e) {
+                    // Si ocurre tainted canvas por CORS, pasa al método 2
+                }
+            }
+
+            // Método 2: Descarga mediante múltiples proxies redundantes
             const proxies = [
-                `https://corsproxy.io/?${encodeURIComponent(url)}`,
-                `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+                `https://wsrv.nl/?url=${encodeURIComponent(rec.photoUrl)}&output=jpg`,
+                `https://corsproxy.io/?${encodeURIComponent(rec.photoUrl)}`,
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(rec.photoUrl)}`
             ];
 
             for (let proxy of proxies) {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+                const timeoutId = setTimeout(() => controller.abort(), IMAGE_FETCH_TIMEOUT_MS);
 
                 try {
                     const response = await fetch(proxy, { signal: controller.signal });
@@ -401,22 +422,26 @@
 
                     if (response.ok) {
                         const blob = await response.blob();
-                        return await new Promise((resolve) => {
+                        const b64 = await new Promise((resolve) => {
                             const reader = new FileReader();
                             reader.onloadend = () => resolve(reader.result);
                             reader.onerror = () => resolve(null);
                             reader.readAsDataURL(blob);
                         });
+
+                        if (b64 && b64.length > 500) {
+                            rec.base64Data = b64;
+                            return b64;
+                        }
                     }
                 } catch (e) {
                     clearTimeout(timeoutId);
-                    // Probar siguiente proxy o descartar si expira el tiempo
                 }
             }
+
             return null;
         }
 
-        // Proceso masivo en Lotes Paralelos (Batch Parallel Processing)
         btnDownloadZip.addEventListener('click', async () => {
             const validRecords = processedRecords.filter(r => r.photoUrl);
             
@@ -427,7 +452,7 @@
 
             isZipCancelled = false;
             btnCancelZip.classList.remove('hidden');
-            showProgress('Iniciando descarga en paralelo...', 0, validRecords.length);
+            showProgress('Empaquetando fotografías en ZIP...', 0, validRecords.length);
 
             const zip = new JSZip();
             const folder = zip.folder("Fotos_GoogleSheets");
@@ -436,7 +461,6 @@
             let addedCount = 0;
             const total = validRecords.length;
 
-            // Procesamiento en lotes de tamaño CONCURRENCY_LIMIT (8 al tiempo)
             for (let i = 0; i < total; i += CONCURRENCY_LIMIT) {
                 if (isZipCancelled) break;
 
@@ -445,11 +469,7 @@
                 await Promise.all(batch.map(async (rec) => {
                     if (isZipCancelled) return;
 
-                    let base64 = rec.base64Data;
-                    if (!base64) {
-                        base64 = await fetchImageWithTimeout(rec.photoUrl, IMAGE_FETCH_TIMEOUT_MS);
-                        if (base64) rec.base64Data = base64; // Cache en memoria
-                    }
+                    const base64 = await extractImageBase64(rec);
 
                     if (base64) {
                         const parts = base64.split(',');
@@ -461,7 +481,7 @@
 
                     completedCount++;
                     const percent = Math.round((completedCount / total) * 100);
-                    updateProgress(percent, completedCount, total, `Procesando: ${rec.displayName}`);
+                    updateProgress(percent, completedCount, total, `Procesadas ${addedCount} fotos exitosamente...`);
                 }));
             }
 
@@ -473,25 +493,32 @@
                 return;
             }
 
+            // AHORA EMPAQUETA SIEMPRE LAS FOTOS OBTENIDAS
             if (addedCount === 0) {
                 hideProgress();
-                alert('No se pudieron obtener los archivos de las fotografías. Verifica que los enlaces de imagen sean accesibles públicamente.');
+                alert('No se pudieron extraer las fotografías. Revisa que el enlace de Google Sheets o las fotos tengan permisos públicos.');
                 return;
             }
 
-            // Generar archivo ZIP instantáneo usando compresión STORE
-            updateProgress(99, completedCount, total, 'Empaquetando archivo ZIP instantáneo...');
+            updateProgress(99, completedCount, total, 'Generando archivo final comprimido...');
 
             setTimeout(async () => {
                 try {
                     const zipBlob = await zip.generateAsync({ 
                         type: "blob", 
-                        compression: "STORE" // Sin delay de CPU
+                        compression: "STORE"
                     });
+                    
                     saveAs(zipBlob, "Fotos_GoogleSheets.zip");
+
+                    if (addedCount < total) {
+                        alert(`¡ZIP generado con éxito!\n\nSe empaquetaron ${addedCount} de ${total} fotografías de la lista. Las imágenes faltantes se debieron a enlaces no accesibles o permisos privados en Google Drive.`);
+                    } else {
+                        alert(`¡Perfecto! Se empaquetaron las ${addedCount} fotografías exitosamente.`);
+                    }
                 } catch (e) {
                     console.error(e);
-                    alert("Error al comprimir el archivo ZIP.");
+                    alert("Ocurrió un error al guardar el archivo ZIP.");
                 } finally {
                     hideProgress();
                 }
@@ -507,9 +534,9 @@
         function updateProgress(percent, completed, total, detailStr) {
             progressBar.style.width = `${percent}%`;
             progressPercentText.textContent = `${percent}%`;
-            progressStatusText.textContent = percent === 100 ? 'Procesamiento masivo completado' : 'Descargando imágenes...';
+            progressStatusText.textContent = percent === 100 ? 'Finalizando empaquetado...' : 'Procesando imágenes...';
             progressDetailsText.textContent = detailStr || '';
-            progressStatsText.textContent = `${completed}/${total} completados`;
+            progressStatsText.textContent = `${completed}/${total} analizados`;
         }
 
         function hideProgress() {
