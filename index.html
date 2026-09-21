@@ -31,7 +31,7 @@
             <div class="flex items-center space-x-3">
                 <i class="fa-solid fa-file-excel text-3xl text-emerald-400"></i>
                 <div>
-                    <h1 class="text-xl font-bold leading-tight">Extractor de Fotos Excel</h1>
+                    <h1 class="text-xl font-bold leading-tight">Extractor de Fotos Excel (Optimizado)</h1>
                     <p class="text-xs text-indigo-200">Formato: APELLIDO1_APELLIDO2_Nombre1_Nombre2</p>
                 </div>
             </div>
@@ -94,6 +94,17 @@
         <div id="loader" class="hidden flex-col items-center justify-center py-12">
             <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-600 mb-3"></i>
             <p class="text-slate-600 font-medium text-sm" id="loaderText">Procesando y convirtiendo imágenes...</p>
+            <div class="w-64 bg-slate-200 h-2 rounded-full mt-3 overflow-hidden">
+                <div id="progressBar" class="bg-indigo-600 h-full w-0 transition-all duration-200"></div>
+            </div>
+        </div>
+
+        <!-- Summary Banner -->
+        <div id="summaryBanner" class="hidden bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-xs text-indigo-800 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-circle-check text-emerald-500 text-lg"></i>
+                <span id="summaryText">Proceso completado.</span>
+            </div>
         </div>
 
         <!-- Grid Results -->
@@ -154,7 +165,10 @@
         const btnDownloadZip = document.getElementById('btnDownloadZip');
         const loader = document.getElementById('loader');
         const loaderText = document.getElementById('loaderText');
+        const progressBar = document.getElementById('progressBar');
         const pdfCanvas = document.getElementById('pdfCanvas');
+        const summaryBanner = document.getElementById('summaryBanner');
+        const summaryText = document.getElementById('summaryText');
 
         const guideModal = document.getElementById('guideModal');
         const btnOpenGuide = document.getElementById('btnOpenGuide');
@@ -180,11 +194,14 @@
 
         excelInput.addEventListener('change', handleFile);
 
+        const yieldToMain = () => new Promise(resolve => setTimeout(resolve, 0));
+
         async function handleFile(e) {
             const file = e.target.files[0];
             if (!file) return;
 
-            showLoader('Procesando datos y extrayendo imágenes...');
+            summaryBanner.classList.add('hidden');
+            showLoader('Procesando datos del archivo Excel...', 0);
             processedRecords = [];
 
             try {
@@ -197,38 +214,57 @@
                 const embeddedImagesMap = await extractEmbeddedImagesFromZip(arrayBuffer);
                 const totalRows = jsonRows.length;
 
-                for (let index = 0; index < totalRows; index++) {
-                    const row = jsonRows[index];
-                    const a1 = cleanField(row['APELLIDO 1'] || row['Apellido 1'] || row['Apellido1'] || row['APELLIDO1'] || '');
-                    const a2 = cleanField(row['APELLIDO 2'] || row['Apellido 2'] || row['Apellido2'] || row['APELLIDO2'] || '');
-                    const n1 = cleanField(row['Nombre 1'] || row['NOMBRE 1'] || row['Nombre1'] || row['NOMBRE1'] || '');
-                    const n2 = cleanField(row['Nombre 2'] || row['NOMBRE 2'] || row['Nombre2'] || row['NOMBRE2'] || '');
+                const batchSize = 4;
+                let successCount = 0;
+                let failCount = 0;
 
-                    // --- CAMBIO DE ORDEN: APELLIDOS PRIMERO ---
-                    const fullNameArray = [a1, a2, n1, n2].filter(Boolean);
-                    const formattedName = fullNameArray.length > 0 
-                        ? fullNameArray.join('_') 
-                        : `Persona_${index + 1}`;
+                for (let index = 0; index < totalRows; index += batchSize) {
+                    const currentBatch = jsonRows.slice(index, index + batchSize);
 
-                    let rawPhoto = row['FOTO'] || row['Foto'] || row['foto'] || '';
-                    let finalPhotoData = null;
+                    const batchPromises = currentBatch.map(async (row, i) => {
+                        const rowIndex = index + i;
 
-                    showLoader(`Procesando registro ${index + 1} de ${totalRows}: ${fullNameArray.join(' ')}`);
+                        const a1 = cleanField(row['APELLIDO 1'] || row['Apellido 1'] || row['Apellido1'] || row['APELLIDO1'] || row['Primer Apellido'] || '');
+                        const a2 = cleanField(row['APELLIDO 2'] || row['Apellido 2'] || row['Apellido2'] || row['APELLIDO2'] || row['Segundo Apellido'] || '');
+                        const n1 = cleanField(row['Nombre 1'] || row['NOMBRE 1'] || row['Nombre1'] || row['NOMBRE1'] || row['Primer Nombre'] || '');
+                        const n2 = cleanField(row['Nombre 2'] || row['NOMBRE 2'] || row['Nombre2'] || row['NOMBRE2'] || row['Segundo Nombre'] || '');
 
-                    if (rawPhoto) {
-                        finalPhotoData = await processUrlResource(rawPhoto);
-                    } else if (embeddedImagesMap[index]) {
-                        finalPhotoData = await blobToBase64(embeddedImagesMap[index]);
-                    }
+                        const fullNameArray = [a1, a2, n1, n2].filter(Boolean);
+                        const formattedName = fullNameArray.length > 0 
+                            ? fullNameArray.join('_') 
+                            : `Persona_${rowIndex + 1}`;
 
-                    processedRecords.push({
-                        id: index,
-                        a1, a2, n1, n2,
-                        filename: `${formattedName}.jpg`,
-                        photoData: finalPhotoData,
-                        displayName: `${a1} ${a2} ${n1} ${n2}`.trim() || `Persona ${index + 1}`
+                        let rawPhoto = row['FOTO'] || row['Foto'] || row['foto'] || row['FOTOS'] || row['URL FOTO'] || row['LINK FOTO'] || row['IMAGEN'] || '';
+                        let finalPhotoData = null;
+
+                        if (rawPhoto) {
+                            finalPhotoData = await processUrlResource(rawPhoto);
+                        } else if (embeddedImagesMap[rowIndex]) {
+                            finalPhotoData = await blobToBase64(embeddedImagesMap[rowIndex]);
+                        }
+
+                        if (finalPhotoData) successCount++;
+                        else failCount++;
+
+                        return {
+                            id: rowIndex,
+                            a1, a2, n1, n2,
+                            filename: `${formattedName}.jpg`,
+                            photoData: finalPhotoData,
+                            displayName: `${a1} ${a2} ${n1} ${n2}`.trim() || `Persona ${rowIndex + 1}`
+                        };
                     });
+
+                    const batchResults = await Promise.all(batchPromises);
+                    processedRecords.push(...batchResults);
+
+                    const progress = Math.round(((index + currentBatch.length) / totalRows) * 100);
+                    showLoader(`Procesando registros ${Math.min(index + batchSize, totalRows)} de ${totalRows}...`, progress);
+                    await yieldToMain();
                 }
+
+                // Liberar memoria de blobs
+                Object.values(embeddedImagesMap).forEach(url => URL.revokeObjectURL(url));
 
                 // Ordenar alfabéticamente por APELLIDO 1
                 processedRecords.sort((a, b) => {
@@ -238,6 +274,9 @@
                 });
 
                 renderGrid(processedRecords);
+
+                summaryBanner.classList.remove('hidden');
+                summaryText.textContent = `Proceso finalizado: ${successCount} fotos procesadas correctamente, ${failCount} registros sin foto o no descargables.`;
 
             } catch (error) {
                 console.error(error);
@@ -251,6 +290,7 @@
             let src = String(url).trim();
             if (src.startsWith('data:image')) return src;
 
+            // Formato Google Drive
             if (src.includes('drive.google.com')) {
                 const idMatch = src.match(/\/d\/([^\/]+)/) || src.match(/id=([^&]+)/);
                 if (idMatch && idMatch[1]) {
@@ -261,17 +301,27 @@
             }
 
             const proxies = [
+                (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
                 (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-                (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`
+                (u) => `https://thingproxy.freeboard.io/fetch/${u}`,
+                (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+                (u) => u
             ];
 
             for (const proxyFn of proxies) {
                 try {
-                    const res = await fetch(proxyFn(src));
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+                    const res = await fetch(proxyFn(src), { signal: controller.signal });
+                    clearTimeout(timeoutId);
+
                     if (!res.ok) continue;
 
                     const contentType = res.headers.get('content-type') || '';
                     const arrayBuffer = await res.arrayBuffer();
+
+                    if (arrayBuffer.byteLength === 0) continue;
 
                     const isPdf = contentType.includes('pdf') || src.toLowerCase().includes('.pdf') || isPdfHeader(arrayBuffer);
 
@@ -298,13 +348,13 @@
             try {
                 const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                 const page = await pdf.getPage(1);
-                const viewport = page.getViewport({ scale: 2.0 });
+                const viewport = page.getViewport({ scale: 1.2 });
                 const context = pdfCanvas.getContext('2d');
                 pdfCanvas.height = viewport.height;
                 pdfCanvas.width = viewport.width;
 
                 await page.render({ canvasContext: context, viewport: viewport }).promise;
-                return pdfCanvas.toDataURL('image/jpeg', 0.92);
+                return pdfCanvas.toDataURL('image/jpeg', 0.85);
             } catch (err) {
                 console.error('Error convirtiendo PDF:', err);
                 return null;
@@ -367,6 +417,8 @@
             controlsBar.classList.remove('hidden');
             statsCount.textContent = `${records.length} registro(s) procesados`;
 
+            const fragment = document.createDocumentFragment();
+
             records.forEach(rec => {
                 const card = document.createElement('div');
                 card.className = 'bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between';
@@ -378,6 +430,7 @@
                     const img = document.createElement('img');
                     img.src = rec.photoData;
                     img.alt = rec.displayName;
+                    img.loading = 'lazy';
                     img.className = 'w-full h-full object-cover';
                     imgContainer.appendChild(img);
                 } else {
@@ -413,8 +466,10 @@
                 infoBox.appendChild(btnDownload);
                 card.appendChild(imgContainer);
                 card.appendChild(infoBox);
-                resultsGrid.appendChild(card);
+                fragment.appendChild(card);
             });
+
+            resultsGrid.appendChild(fragment);
         }
 
         searchInput.addEventListener('input', (e) => {
@@ -434,7 +489,7 @@
                 return;
             }
 
-            showLoader('Empaquetando fotos en archivo ZIP...');
+            showLoader('Empaquetando fotos en el ZIP...', 0);
             const zip = new JSZip();
             const folder = zip.folder("Fotos_Ordenadas_Por_Apellido");
 
@@ -444,15 +499,26 @@
                     const base64Data = rec.photoData.split(',')[1];
                     folder.file(rec.filename, base64Data, { base64: true });
                 }
+                if (i % 10 === 0) {
+                    const prog = Math.round((i / recordsWithImages.length) * 100);
+                    showLoader(`Empaquetando (${i}/${recordsWithImages.length})...`, prog);
+                    await yieldToMain();
+                }
             }
 
-            const content = await zip.generateAsync({ type: "blob" });
+            showLoader('Generando archivo final...', 100);
+            const content = await zip.generateAsync({ 
+                type: "blob", 
+                compression: "STORE" 
+            });
+
             saveAs(content, "Fotos_Excel_Ordenadas.zip");
             hideLoader();
         });
 
-        function showLoader(msg) {
+        function showLoader(msg, progress = 0) {
             loaderText.textContent = msg;
+            progressBar.style.width = `${progress}%`;
             loader.classList.remove('hidden');
             loader.classList.add('flex');
         }
