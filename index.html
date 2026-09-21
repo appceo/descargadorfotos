@@ -3,15 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extractor de Fotos desde Google Sheets</title>
+    <title>Extractor de Fotos Ultra-Rápido - Google Sheets</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome -->
+    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- JSZip -->
+    <!-- JSZip (High speed zip archiving) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- FileSaver -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
 
@@ -19,11 +25,20 @@
     <header class="bg-indigo-600 text-white shadow-md">
         <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div class="flex items-center space-x-3">
-                <i class="fa-solid fa-link text-3xl text-emerald-400"></i>
-                <div>
-                    <h1 class="text-xl font-bold leading-tight">Extractor de Fotos - Google Sheets</h1>
-                    <p class="text-xs text-indigo-200">Formato: APELLIDO 1_APELLIDO 2_Nombre 1_Nombre 2.jpg</p>
+                <div class="bg-emerald-500/20 p-2 rounded-xl border border-emerald-400/30">
+                    <i class="fa-solid fa-bolt text-2xl text-emerald-400"></i>
                 </div>
+                <div>
+                    <h1 class="text-xl font-bold leading-tight flex items-center gap-2">
+                        Extractor de Fotos 
+                        <span class="text-xs bg-emerald-500 text-slate-900 font-extrabold px-2 py-0.5 rounded-full uppercase">Google Sheets</span>
+                    </h1>
+                    <p class="text-xs text-indigo-200">Formato automático: APELLIDO 1_APELLIDO 2_Nombre 1_Nombre 2.jpg</p>
+                </div>
+            </div>
+            <div class="text-xs text-indigo-100 bg-indigo-700/60 px-3 py-1.5 rounded-lg border border-indigo-500/40">
+                <i class="fa-solid fa-shield-halved text-emerald-300 mr-1"></i>
+                Procesamiento Paralelo Ultra-Rápido
             </div>
         </div>
     </header>
@@ -34,60 +49,94 @@
         <!-- Link Input Area -->
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <label for="sheetUrlInput" class="block text-sm font-semibold text-slate-700 mb-2">
-                <i class="fa-solid fa-table text-indigo-600 mr-1"></i> Pega aquí el enlace de tu hoja de cálculo de Google Sheets:
+                <i class="fa-solid fa-link text-indigo-600 mr-1"></i> Pega aquí el enlace de tu hoja de cálculo de Google Sheets:
             </label>
             <div class="flex flex-col sm:flex-row gap-3">
                 <input type="url" id="sheetUrlInput" placeholder="https://docs.google.com/spreadsheets/d/1k3p0YhVaFlGYwpUwo5k4pS28oW4h29HKqWOxFh2HE_k/edit?usp=sharing" class="flex-grow px-4 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
                 <button id="btnProcessUrl" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-6 py-2.5 rounded-lg shadow transition flex items-center justify-center space-x-2 whitespace-nowrap">
-                    <i class="fa-solid fa-bolt"></i>
+                    <i class="fa-solid fa-cloud-arrow-down"></i>
                     <span>Cargar Datos</span>
                 </button>
             </div>
-            <p class="text-xs text-slate-500 mt-2">
-                * La hoja de cálculo debe estar configurada con acceso público: <strong>"Cualquier persona con el enlace puede ver"</strong>.
-            </p>
+            <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
+                <span><i class="fa-solid fa-lock-open text-emerald-500 mr-1"></i> La hoja debe tener permisos: <strong>"Cualquier persona con el enlace puede ver"</strong>.</span>
+                <span id="columnDetectionBadge" class="hidden text-indigo-600 font-medium bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">Columnas detectadas</span>
+            </div>
+        </div>
+
+        <!-- Progress Container (Barra de progreso interactiva) -->
+        <div id="progressContainer" class="hidden bg-white rounded-xl border border-indigo-100 p-6 shadow-sm flex flex-col gap-3">
+            <div class="flex justify-between items-center text-sm font-semibold text-slate-700">
+                <div class="flex items-center space-x-2">
+                    <i id="progressIcon" class="fa-solid fa-spinner fa-spin text-indigo-600 text-lg"></i>
+                    <span id="progressStatusText">Procesando registros en paralelo...</span>
+                </div>
+                <span id="progressPercentText" class="text-indigo-600 font-mono text-base font-bold">0%</span>
+            </div>
+            
+            <!-- Dynamic Progress Bar -->
+            <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden p-0.5 border border-slate-200">
+                <div id="progressBar" class="bg-gradient-to-r from-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-150 ease-out w-0"></div>
+            </div>
+
+            <div class="flex justify-between items-center text-xs text-slate-500">
+                <span id="progressDetailsText">Preparando descarga de fotos...</span>
+                <div class="flex items-center gap-3">
+                    <span id="progressStatsText" class="font-mono font-semibold text-slate-600">0/0 completados</span>
+                    <button id="btnCancelZip" class="hidden text-xs text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded font-medium border border-rose-200 transition">
+                        <i class="fa-solid fa-xmark mr-1"></i>Cancelar
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Controls Bar -->
         <div id="controlsBar" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="flex items-center space-x-3 w-full md:w-auto">
-                <div class="relative w-full md:w-64">
+                <div class="relative w-full md:w-72">
                     <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
                     <input type="text" id="searchInput" placeholder="Buscar por nombre o apellido..." class="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
-                <div class="text-xs text-slate-500 font-medium whitespace-nowrap" id="statsCount">
+                <div class="text-xs text-slate-500 font-medium whitespace-nowrap bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200" id="statsCount">
                     0 registros
                 </div>
             </div>
 
             <div class="flex items-center space-x-3 w-full md:w-auto justify-end">
+                <div class="text-xs text-indigo-600 font-semibold bg-indigo-50 px-3 py-2 rounded-lg border border-indigo-100 flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrow-down-a-z"></i>
+                    <span>Orden: APELLIDO 1</span>
+                </div>
                 <button id="btnDownloadZip" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow transition flex items-center space-x-2">
                     <i class="fa-solid fa-file-zipper text-base"></i>
-                    <span>Descargar Todo (.ZIP)</span>
+                    <span>Descargar Todo (.ZIP Ultra-Rápido)</span>
                 </button>
             </div>
-        </div>
-
-        <!-- Progress Spinner -->
-        <div id="loader" class="hidden flex-col items-center justify-center py-12 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-600 mb-3"></i>
-            <p class="text-slate-700 font-semibold text-sm" id="loaderText">Conectando con Google Sheets...</p>
         </div>
 
         <!-- Grid Results -->
         <div id="resultsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
 
         <!-- Empty State -->
-        <div id="emptyState" class="text-center py-12 bg-white rounded-xl border border-slate-200 p-8">
-            <i class="fa-solid fa-images text-5xl text-slate-300 mb-3"></i>
-            <h3 class="text-base font-semibold text-slate-600">No hay fotos cargadas</h3>
-            <p class="text-xs text-slate-400 mt-1">Ingresa el enlace de Google Sheets arriba para extraer la información.</p>
+        <div id="emptyState" class="text-center py-16 bg-white rounded-xl border border-slate-200 p-8">
+            <div class="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-indigo-100 text-indigo-500">
+                <i class="fa-solid fa-table-list text-2xl"></i>
+            </div>
+            <h3 class="text-base font-semibold text-slate-700">No hay fotografías cargadas</h3>
+            <p class="text-xs text-slate-400 max-w-md mx-auto mt-1">Ingresa el enlace de Google Sheets arriba para previsualizar los registros e iniciar la descarga en paquete ZIP.</p>
         </div>
     </main>
 
     <script>
-        let processedRecords = [];
+        // Configuración de Concurrencia y Tiempos Límites
+        const CONCURRENCY_LIMIT = 8;        // Procesamiento simultáneo de 8 imágenes a la vez
+        const IMAGE_FETCH_TIMEOUT_MS = 3500; // Timeout máximo por imagen (3.5 segundos)
 
+        // Estado Global de la App
+        let processedRecords = [];
+        let isZipCancelled = false;
+
+        // Elementos DOM principales
         const sheetUrlInput = document.getElementById('sheetUrlInput');
         const btnProcessUrl = document.getElementById('btnProcessUrl');
         const resultsGrid = document.getElementById('resultsGrid');
@@ -96,12 +145,26 @@
         const statsCount = document.getElementById('statsCount');
         const searchInput = document.getElementById('searchInput');
         const btnDownloadZip = document.getElementById('btnDownloadZip');
-        const loader = document.getElementById('loader');
-        const loaderText = document.getElementById('loaderText');
+        const btnCancelZip = document.getElementById('btnCancelZip');
+        const columnDetectionBadge = document.getElementById('columnDetectionBadge');
 
+        // Elementos de la Barra de Progreso
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressPercentText = document.getElementById('progressPercentText');
+        const progressStatusText = document.getElementById('progressStatusText');
+        const progressDetailsText = document.getElementById('progressDetailsText');
+        const progressStatsText = document.getElementById('progressStatsText');
+        const progressIcon = document.getElementById('progressIcon');
+
+        // Event Listeners
         btnProcessUrl.addEventListener('click', processSheetUrl);
         sheetUrlInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') processSheetUrl();
+        });
+        btnCancelZip.addEventListener('click', () => {
+            isZipCancelled = true;
+            progressStatusText.textContent = 'Cancelando generación de ZIP...';
         });
 
         async function processSheetUrl() {
@@ -111,41 +174,42 @@
                 return;
             }
 
-            // Extraer el ID único del archivo desde el enlace
             const sheetIdMatch = rawUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
             if (!sheetIdMatch || !sheetIdMatch[1]) {
-                alert('El enlace ingresado no parece ser un documento de Google Sheets válido.');
+                alert('El enlace ingresado no parece ser una hoja de cálculo válida de Google Sheets.');
                 return;
             }
 
             const sheetId = sheetIdMatch[1];
             const csvExportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
 
-            showLoader('Conectando con Google Sheets...');
+            showProgress('Leyendo registros desde Google Sheets...', 0, 100);
             processedRecords = [];
 
             try {
                 const response = await fetch(csvExportUrl);
                 if (!response.ok) {
-                    throw new Error('No se pudo acceder a la hoja. Asegúrate de que el documento tenga acceso público.');
+                    throw new Error('No se pudo acceder a la hoja. Asegúrate de que tenga permisos de lectura "Cualquier persona con el enlace".');
                 }
-                
+
                 const csvText = await response.text();
                 const rows = parseCSV(csvText);
 
                 if (rows.length < 2) {
-                    alert('El documento parece estar vacío o no contiene filas de datos.');
-                    hideLoader();
+                    alert('El documento no contiene filas suficientes o está vacío.');
+                    hideProgress();
                     return;
                 }
 
                 const headers = rows[0].map(h => cleanStr(h).toUpperCase());
-                
+
                 const idxA1 = headers.findIndex(h => h.includes('APELLIDO 1') || h.includes('APELLIDO1'));
                 const idxA2 = headers.findIndex(h => h.includes('APELLIDO 2') || h.includes('APELLIDO2'));
                 const idxN1 = headers.findIndex(h => h.includes('NOMBRE 1') || h.includes('NOMBRE1'));
                 const idxN2 = headers.findIndex(h => h.includes('NOMBRE 2') || h.includes('NOMBRE2'));
                 const idxFoto = headers.findIndex(h => h.includes('FOTO') || h.includes('IMAGEN') || h.includes('URL'));
+
+                columnDetectionBadge.classList.remove('hidden');
 
                 for (let i = 1; i < rows.length; i++) {
                     const row = rows[i];
@@ -180,14 +244,13 @@
                 // Ordenar alfabéticamente por APELLIDO 1
                 processedRecords.sort((a, b) => a.a1.localeCompare(b.a1, 'es', { sensitivity: 'base' }));
 
-                renderGrid(processedRecords);
-                preloadImagesBase64();
+                hideProgress();
+                renderGridBatch(processedRecords);
 
             } catch (error) {
                 console.error(error);
-                alert('Ocurrió un error al cargar la hoja. Verifica que la opción "Cualquier persona con el enlace puede ver" esté activada en Google Drive.');
-            } finally {
-                hideLoader();
+                hideProgress();
+                alert('Ocurrió un error al conectar con Google Sheets. Revisa la opción "Compartir" -> "Cualquier persona con el enlace puede ver".');
             }
         }
 
@@ -202,48 +265,6 @@
                 }
             }
             return src;
-        }
-
-        async function preloadImagesBase64() {
-            for (let rec of processedRecords) {
-                if (rec.photoUrl && !rec.base64Data) {
-                    try {
-                        const base64 = await fetchImageAsBase64(rec.photoUrl);
-                        if (base64) rec.base64Data = base64;
-                    } catch (e) {
-                        console.warn('No se pudo convertir la foto:', rec.photoUrl);
-                    }
-                }
-            }
-        }
-
-        async function fetchImageAsBase64(url) {
-            const proxies = [
-                `https://corsproxy.io/?${encodeURIComponent(url)}`,
-                `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
-            ];
-
-            for (let proxy of proxies) {
-                try {
-                    const res = await fetch(proxy);
-                    if (res.ok) {
-                        const blob = await res.blob();
-                        return await blobToBase64(blob);
-                    }
-                } catch (e) {
-                    continue;
-                }
-            }
-            return null;
-        }
-
-        function blobToBase64(blob) {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.onerror = () => resolve(null);
-                reader.readAsDataURL(blob);
-            });
         }
 
         function parseCSV(text) {
@@ -274,7 +295,7 @@
             return String(str || '').trim();
         }
 
-        function renderGrid(records) {
+        function renderGridBatch(records) {
             resultsGrid.innerHTML = '';
 
             if (records.length === 0) {
@@ -285,7 +306,9 @@
 
             emptyState.classList.add('hidden');
             controlsBar.classList.remove('hidden');
-            statsCount.textContent = `${records.length} registro(s) procesados`;
+            statsCount.textContent = `${records.length} registros cargados`;
+
+            const fragment = document.createDocumentFragment();
 
             records.forEach(rec => {
                 const card = document.createElement('div');
@@ -298,33 +321,34 @@
                     const img = document.createElement('img');
                     img.src = rec.photoUrl;
                     img.alt = rec.displayName;
+                    img.loading = 'lazy';
                     img.className = 'w-full h-full object-cover';
                     img.onerror = () => {
                         imgContainer.innerHTML = `<div class="text-center p-4 text-slate-400">
                             <i class="fa-regular fa-image text-3xl mb-1 text-slate-300"></i>
-                            <p class="text-xs">Foto no encontrada / Sin acceso</p>
+                            <p class="text-xs">Sin vista previa / No accesible</p>
                         </div>`;
                     };
                     imgContainer.appendChild(img);
                 } else {
                     imgContainer.innerHTML = `<div class="text-center p-4 text-slate-400">
-                        <i class="fa-regular fa-image text-3xl mb-1"></i>
-                        <p class="text-xs">Sin foto en Google Sheets</p>
+                        <i class="fa-regular fa-image text-3xl mb-1 text-slate-300"></i>
+                        <p class="text-xs">Sin URL de foto</p>
                     </div>`;
                 }
 
                 const infoBox = document.createElement('div');
-                infoBox.className = 'p-4 flex-grow flex flex-col justify-between';
+                infoBox.className = 'p-3.5 flex-grow flex flex-col justify-between';
 
                 infoBox.innerHTML = `
                     <div>
-                        <h4 class="font-bold text-slate-800 text-sm truncate" title="${rec.displayName}">${rec.displayName}</h4>
-                        <p class="text-xs font-mono text-indigo-600 font-semibold mt-0.5 truncate" title="${rec.filename}">${rec.filename}</p>
+                        <h4 class="font-bold text-slate-800 text-xs truncate" title="${rec.displayName}">${rec.displayName}</h4>
+                        <p class="text-[11px] font-mono text-indigo-600 font-semibold mt-0.5 truncate" title="${rec.filename}">${rec.filename}</p>
                     </div>
                 `;
 
                 const btnDownload = document.createElement('button');
-                btnDownload.className = `mt-3 w-full text-xs font-medium py-2 rounded-lg flex items-center justify-center space-x-2 transition ${
+                btnDownload.className = `mt-2.5 w-full text-xs font-medium py-1.5 rounded-lg flex items-center justify-center space-x-1.5 transition ${
                     rec.photoUrl 
                         ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700' 
                         : 'bg-slate-100 text-slate-400 cursor-not-allowed'
@@ -337,12 +361,15 @@
                         if (rec.base64Data) {
                             saveAs(rec.base64Data, rec.filename);
                         } else {
-                            const b64 = await fetchImageAsBase64(rec.photoUrl);
+                            btnDownload.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Obteniendo...</span>`;
+                            const b64 = await fetchImageWithTimeout(rec.photoUrl, IMAGE_FETCH_TIMEOUT_MS);
                             if (b64) {
                                 rec.base64Data = b64;
                                 saveAs(b64, rec.filename);
+                                btnDownload.innerHTML = `<i class="fa-solid fa-check text-emerald-600"></i> <span>Completado</span>`;
                             } else {
                                 window.open(rec.photoUrl, '_blank');
+                                btnDownload.innerHTML = `<i class="fa-solid fa-arrow-up-right-from-square"></i> <span>Abrir enlace</span>`;
                             }
                         }
                     });
@@ -351,8 +378,143 @@
                 infoBox.appendChild(btnDownload);
                 card.appendChild(imgContainer);
                 card.appendChild(infoBox);
-                resultsGrid.appendChild(card);
+                fragment.appendChild(card);
             });
+
+            resultsGrid.appendChild(fragment);
+        }
+
+        // Descargar imagen con timeout estricto para evitar bloqueos colapsados
+        async function fetchImageWithTimeout(url, timeoutMs) {
+            const proxies = [
+                `https://corsproxy.io/?${encodeURIComponent(url)}`,
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+            ];
+
+            for (let proxy of proxies) {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+                try {
+                    const response = await fetch(proxy, { signal: controller.signal });
+                    clearTimeout(timeoutId);
+
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        return await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result);
+                            reader.onerror = () => resolve(null);
+                            reader.readAsDataURL(blob);
+                        });
+                    }
+                } catch (e) {
+                    clearTimeout(timeoutId);
+                    // Probar siguiente proxy o descartar si expira el tiempo
+                }
+            }
+            return null;
+        }
+
+        // Proceso masivo en Lotes Paralelos (Batch Parallel Processing)
+        btnDownloadZip.addEventListener('click', async () => {
+            const validRecords = processedRecords.filter(r => r.photoUrl);
+            
+            if (validRecords.length === 0) {
+                alert('No hay fotografías disponibles para descargar.');
+                return;
+            }
+
+            isZipCancelled = false;
+            btnCancelZip.classList.remove('hidden');
+            showProgress('Iniciando descarga en paralelo...', 0, validRecords.length);
+
+            const zip = new JSZip();
+            const folder = zip.folder("Fotos_GoogleSheets");
+            
+            let completedCount = 0;
+            let addedCount = 0;
+            const total = validRecords.length;
+
+            // Procesamiento en lotes de tamaño CONCURRENCY_LIMIT (8 al tiempo)
+            for (let i = 0; i < total; i += CONCURRENCY_LIMIT) {
+                if (isZipCancelled) break;
+
+                const batch = validRecords.slice(i, i + CONCURRENCY_LIMIT);
+
+                await Promise.all(batch.map(async (rec) => {
+                    if (isZipCancelled) return;
+
+                    let base64 = rec.base64Data;
+                    if (!base64) {
+                        base64 = await fetchImageWithTimeout(rec.photoUrl, IMAGE_FETCH_TIMEOUT_MS);
+                        if (base64) rec.base64Data = base64; // Cache en memoria
+                    }
+
+                    if (base64) {
+                        const parts = base64.split(',');
+                        if (parts.length === 2) {
+                            folder.file(rec.filename, parts[1], { base64: true });
+                            addedCount++;
+                        }
+                    }
+
+                    completedCount++;
+                    const percent = Math.round((completedCount / total) * 100);
+                    updateProgress(percent, completedCount, total, `Procesando: ${rec.displayName}`);
+                }));
+            }
+
+            btnCancelZip.classList.add('hidden');
+
+            if (isZipCancelled) {
+                hideProgress();
+                alert('Generación del paquete ZIP cancelada.');
+                return;
+            }
+
+            if (addedCount === 0) {
+                hideProgress();
+                alert('No se pudieron obtener los archivos de las fotografías. Verifica que los enlaces de imagen sean accesibles públicamente.');
+                return;
+            }
+
+            // Generar archivo ZIP instantáneo usando compresión STORE
+            updateProgress(99, completedCount, total, 'Empaquetando archivo ZIP instantáneo...');
+
+            setTimeout(async () => {
+                try {
+                    const zipBlob = await zip.generateAsync({ 
+                        type: "blob", 
+                        compression: "STORE" // Sin delay de CPU
+                    });
+                    saveAs(zipBlob, "Fotos_GoogleSheets.zip");
+                } catch (e) {
+                    console.error(e);
+                    alert("Error al comprimir el archivo ZIP.");
+                } finally {
+                    hideProgress();
+                }
+            }, 100);
+        });
+
+        function showProgress(status, current, total) {
+            progressContainer.classList.remove('hidden');
+            progressIcon.className = "fa-solid fa-spinner fa-spin text-indigo-600 text-lg";
+            updateProgress(total > 0 ? Math.round((current / total) * 100) : 0, current, total, status);
+        }
+
+        function updateProgress(percent, completed, total, detailStr) {
+            progressBar.style.width = `${percent}%`;
+            progressPercentText.textContent = `${percent}%`;
+            progressStatusText.textContent = percent === 100 ? 'Procesamiento masivo completado' : 'Descargando imágenes...';
+            progressDetailsText.textContent = detailStr || '';
+            progressStatsText.textContent = `${completed}/${total} completados`;
+        }
+
+        function hideProgress() {
+            progressContainer.classList.add('hidden');
+            btnCancelZip.classList.add('hidden');
         }
 
         searchInput.addEventListener('input', (e) => {
@@ -361,61 +523,8 @@
                 r.displayName.toLowerCase().includes(term) || 
                 r.filename.toLowerCase().includes(term)
             );
-            renderGrid(filtered);
+            renderGridBatch(filtered);
         });
-
-        // DESCARGA EN PAQUETE ZIP
-        btnDownloadZip.addEventListener('click', async () => {
-            const validRecords = processedRecords.filter(r => r.photoUrl);
-            
-            if (validRecords.length === 0) {
-                alert('No hay fotos disponibles para descargar.');
-                return;
-            }
-
-            showLoader('Generando paquete ZIP...');
-            
-            const zip = new JSZip();
-            let addedCount = 0;
-
-            for (let rec of validRecords) {
-                let base64 = rec.base64Data || await fetchImageAsBase64(rec.photoUrl);
-                if (base64) {
-                    const parts = base64.split(',');
-                    if (parts.length === 2) {
-                        zip.file(rec.filename, parts[1], { base64: true });
-                        addedCount++;
-                    }
-                }
-            }
-
-            if (addedCount === 0) {
-                hideLoader();
-                alert('No se pudieron descargar las imágenes. Comprueba los permisos de lectura de la carpeta de imágenes en Google Drive.');
-                return;
-            }
-
-            try {
-                const content = await zip.generateAsync({ type: "blob" });
-                saveAs(content, "Fotos_GoogleSheets.zip");
-            } catch (e) {
-                console.error(e);
-                alert("Error al crear el archivo ZIP.");
-            } finally {
-                hideLoader();
-            }
-        });
-
-        function showLoader(msg) {
-            loaderText.textContent = msg;
-            loader.classList.remove('hidden');
-            loader.classList.add('flex');
-        }
-
-        function hideLoader() {
-            loader.classList.add('hidden');
-            loader.classList.remove('flex');
-        }
     </script>
 </body>
 </html>
