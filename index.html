@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extractor de Fotos Excel - 100% Funcional</title>
+    <title>Extractor de Fotos Excel - Ultra Rápido</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
@@ -40,7 +40,7 @@
                 <div class="text-center pointer-events-none z-0">
                     <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-500 mb-3"></i>
                     <h3 class="text-lg font-semibold text-slate-700">Arrastra tu archivo Excel aquí o haz clic para seleccionar</h3>
-                    <p class="text-xs text-slate-500 mt-1">Soporta enlaces, hipervínculos o fotos insertadas directamente en el archivo</p>
+                    <p class="text-xs text-slate-500 mt-1">Soporta URLs y fotos incrustadas en el archivo</p>
                 </div>
             </div>
         </div>
@@ -53,14 +53,14 @@
                     <input type="text" id="searchInput" placeholder="Buscar por nombre o apellido..." class="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
                 <div class="text-xs text-slate-500 font-medium whitespace-nowrap" id="statsCount">
-                    0 registros cargados
+                    0 registros procesados
                 </div>
             </div>
 
             <div class="flex items-center space-x-3 w-full md:w-auto justify-end">
                 <button id="btnDownloadZip" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow transition flex items-center space-x-2">
                     <i class="fa-solid fa-file-zipper text-base"></i>
-                    <span>Descargar Todo (.ZIP Instantáneo)</span>
+                    <span>Descargar Todo (.ZIP)</span>
                 </button>
             </div>
         </div>
@@ -68,7 +68,7 @@
         <!-- Progress Spinner -->
         <div id="loader" class="hidden flex-col items-center justify-center py-12 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
             <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-600 mb-3"></i>
-            <p class="text-slate-700 font-semibold text-sm" id="loaderText">Extrayendo imágenes y procesando datos...</p>
+            <p class="text-slate-700 font-semibold text-sm" id="loaderText">Cargando archivo...</p>
         </div>
 
         <!-- Grid Results -->
@@ -78,7 +78,7 @@
         <div id="emptyState" class="text-center py-12 bg-white rounded-xl border border-slate-200 p-8">
             <i class="fa-solid fa-image text-5xl text-slate-300 mb-3"></i>
             <h3 class="text-base font-semibold text-slate-600">No hay fotos cargadas</h3>
-            <p class="text-xs text-slate-400 mt-1">Carga un archivo Excel para extraer las fotos de tus registros.</p>
+            <p class="text-xs text-slate-400 mt-1">Carga un archivo Excel para extraer las fotos.</p>
         </div>
     </main>
 
@@ -109,30 +109,32 @@
             const file = e.target.files[0];
             if (!file) return;
 
-            showLoader('Leyendo el archivo Excel y procesando imágenes...');
+            showLoader('Leyendo el archivo Excel...');
             processedRecords = [];
+
+            // Timeout de seguridad de 10 segundos para prevenir cuelgues eternos
+            const loadTimeout = setTimeout(() => {
+                hideLoader();
+                alert('El archivo tardó demasiado en responder. Revisa si contiene imágenes demasiado pesadas.');
+            }, 10000);
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
                 
-                // 1. Extraer imágenes físicas del paquete comprimido de Excel (xl/media)
-                const embeddedImagesList = await extractAllZipImages(arrayBuffer);
+                // 1. Extracción directa de medios (ZIP)
+                const zipImages = await extractZipImagesFast(arrayBuffer);
 
-                // 2. Leer datos con SheetJS
-                const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true, cellStyles: true, cellFormulas: true });
+                // 2. Parseo directo de SheetJS
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-                // Mapear hipervínculos por celda si existen en SheetJS
-                const hyperlinksMap = extractHyperlinks(worksheet);
-
-                let mediaImageIndex = 0;
+                let zipImgIndex = 0;
 
                 for (let index = 0; index < jsonRows.length; index++) {
                     const row = jsonRows[index];
 
-                    // Extraer nombres y apellidos buscando variaciones de encabezado
                     const a1 = cleanField(row['APELLIDO 1'] || row['Apellido 1'] || row['Apellido1'] || row['APELLIDO1'] || '');
                     const a2 = cleanField(row['APELLIDO 2'] || row['Apellido 2'] || row['Apellido2'] || row['APELLIDO2'] || '');
                     const n1 = cleanField(row['Nombre 1'] || row['NOMBRE 1'] || row['Nombre1'] || row['NOMBRE1'] || '');
@@ -141,33 +143,24 @@
                     const fullNameParts = [a1, a2, n1, n2].filter(Boolean);
                     const formattedFilename = fullNameParts.length > 0 
                         ? fullNameParts.join('_') 
-                        : `Persona_${index + 1}`;
+                        : `Registro_${index + 1}`;
 
                     const displayName = `${a1} ${a2} ${n1} ${n2}`.trim() || `Persona ${index + 1}`;
-                    
-                    let rawPhoto = row['FOTO'] || row['Foto'] || row['foto'] || row['FOTOS'] || '';
+                    let rawPhoto = row['FOTO'] || row['Foto'] || row['foto'] || '';
                     let finalBase64Image = null;
 
-                    // Método A: Buscar hipervínculo en la celda
-                    const rowExcelIndex = index + 2; // Fila 1 = Encabezados
-                    if (!rawPhoto && hyperlinksMap[rowExcelIndex]) {
-                        rawPhoto = hyperlinksMap[rowExcelIndex];
-                    }
-
-                    // Método B: Procesar si es URL/Base64
+                    // A. Si es Base64 o URL directa
                     if (rawPhoto && typeof rawPhoto === 'string') {
                         rawPhoto = rawPhoto.trim();
                         if (rawPhoto.startsWith('data:image')) {
                             finalBase64Image = rawPhoto;
-                        } else if (rawPhoto.startsWith('http://') || rawPhoto.startsWith('https://')) {
-                            finalBase64Image = await downloadUrlAsBase64(rawPhoto);
                         }
                     }
 
-                    // Método C: Asignar imagen embebida del archivo Excel por secuencia
-                    if (!finalBase64Image && embeddedImagesList[mediaImageIndex]) {
-                        finalBase64Image = embeddedImagesList[mediaImageIndex];
-                        mediaImageIndex++;
+                    // B. Si la foto proviene del paquete ZIP del archivo Excel
+                    if (!finalBase64Image && zipImages[zipImgIndex]) {
+                        finalBase64Image = zipImages[zipImgIndex];
+                        zipImgIndex++;
                     }
 
                     processedRecords.push({
@@ -182,27 +175,28 @@
                 // Ordenar por APELLIDO 1
                 processedRecords.sort((a, b) => a.a1.localeCompare(b.a1, 'es', { sensitivity: 'base' }));
 
+                clearTimeout(loadTimeout);
                 renderGrid(processedRecords);
 
             } catch (error) {
+                clearTimeout(loadTimeout);
                 console.error(error);
-                alert('Ocurrió un error al procesar el archivo Excel.');
+                alert('Ocurrió un error al procesar el archivo.');
             } finally {
                 hideLoader();
                 excelInput.value = '';
             }
         }
 
-        // Extrae todas las fotos embebidas directamente de la carpeta xl/media del ZIP
-        async function extractAllZipImages(arrayBuffer) {
-            const imagesList = [];
+        // Extracción directa sin llamadas externas bloquear
+        async function extractZipImagesFast(arrayBuffer) {
+            const images = [];
             try {
                 const zip = await JSZip.loadAsync(arrayBuffer);
                 const mediaFiles = Object.keys(zip.files).filter(path => 
                     path.startsWith('xl/media/') && !path.endsWith('/')
                 );
 
-                // Ordenar archivos de imagen por número correlativo (image1, image2, ...)
                 mediaFiles.sort((a, b) => {
                     const numA = parseInt(a.replace(/[^0-9]/g, '')) || 0;
                     const numB = parseInt(b.replace(/[^0-9]/g, '')) || 0;
@@ -212,64 +206,12 @@
                 for (const filePath of mediaFiles) {
                     const blob = await zip.files[filePath].async('blob');
                     const base64 = await blobToBase64(blob);
-                    if (base64) imagesList.push(base64);
+                    if (base64) images.push(base64);
                 }
-            } catch (err) {
-                console.warn('No se pudieron extraer imágenes internas del ZIP:', err);
+            } catch (e) {
+                console.warn('No se encontraron imágenes internas en la carpeta media:', e);
             }
-            return imagesList;
-        }
-
-        // Extraer URLs de Hipervínculos explícitos en celdas
-        function extractHyperlinks(worksheet) {
-            const map = {};
-            for (const cellAddress in worksheet) {
-                if (cellAddress[0] === '!') continue;
-                const cell = worksheet[cellAddress];
-                if (cell && cell.l && cell.l.Target) {
-                    const rowMatch = cellAddress.match(/\d+/);
-                    if (rowMatch) {
-                        const rowNum = parseInt(rowMatch[0]);
-                        map[rowNum] = cell.l.Target;
-                    }
-                }
-            }
-            return map;
-        }
-
-        // Descarga imágenes desde URL pública o Google Drive
-        async function downloadUrlAsBase64(urlStr) {
-            let src = urlStr.trim();
-
-            if (src.includes('drive.google.com')) {
-                const idMatch = src.match(/\/d\/([^\/]+)/) || src.match(/id=([^&]+)/);
-                if (idMatch && idMatch[1]) {
-                    src = `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
-                }
-            }
-
-            const proxies = [
-                `https://corsproxy.io/?${encodeURIComponent(src)}`,
-                `https://api.allorigins.win/raw?url=${encodeURIComponent(src)}`
-            ];
-
-            for (const proxy of proxies) {
-                try {
-                    const controller = new AbortController();
-                    const timer = setTimeout(() => controller.abort(), 3500);
-
-                    const res = await fetch(proxy, { signal: controller.signal });
-                    clearTimeout(timer);
-
-                    if (res.ok) {
-                        const blob = await res.blob();
-                        return await blobToBase64(blob);
-                    }
-                } catch (e) {
-                    continue;
-                }
-            }
-            return null;
+            return images;
         }
 
         function blobToBase64(blob) {
@@ -314,7 +256,7 @@
                 } else {
                     imgContainer.innerHTML = `<div class="text-center p-4 text-slate-400">
                         <i class="fa-regular fa-image text-3xl mb-1"></i>
-                        <p class="text-xs font-medium">Sin foto / No encontrada</p>
+                        <p class="text-xs">Sin foto / No encontrada</p>
                     </div>`;
                 }
 
@@ -357,16 +299,16 @@
             renderGrid(filtered);
         });
 
-        // DESCARGA EN ZIP COMPLETA
+        // DESCARGA ZIP
         btnDownloadZip.addEventListener('click', async () => {
             const validRecords = processedRecords.filter(r => r.photoData && r.photoData.startsWith('data:image'));
             
             if (validRecords.length === 0) {
-                alert('No hay fotos disponibles para descargar en el archivo ZIP.');
+                alert('No hay fotos listas para descargar.');
                 return;
             }
 
-            showLoader('Generando paquete ZIP con todas las imágenes...');
+            showLoader('Generando archivo ZIP...');
             const zip = new JSZip();
 
             validRecords.forEach(rec => {
@@ -378,10 +320,10 @@
 
             try {
                 const content = await zip.generateAsync({ type: "blob" });
-                saveAs(content, "Fotos_Excel_Procesadas.zip");
+                saveAs(content, "Fotos_Excel.zip");
             } catch (e) {
                 console.error(e);
-                alert("Error al comprimir el paquete ZIP.");
+                alert("Error al comprimir el archivo ZIP.");
             } finally {
                 hideLoader();
             }
